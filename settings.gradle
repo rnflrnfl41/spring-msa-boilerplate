@@ -1,0 +1,4 @@
+rootProject.name = 'springMsaBoilerplate'
+
+include 'apiGateway'
+include 'authServer'

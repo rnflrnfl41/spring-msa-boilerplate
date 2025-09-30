@@ -1,0 +1,21 @@
+// 루트 프로젝트에서 plugins, group, version, repositories, dependencyManagement 상속
+
+dependencies {
+    // Spring Security OAuth2 Authorization Server
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-authorization-server'
+    
+    // Spring Security
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    
+    // Spring Boot Web
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    
+    // Service Discovery (Eureka Client)
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+    
+    // Spring Boot Actuator (Health Check)
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    
+    // JWT
+    implementation 'org.springframework.security:spring-security-oauth2-jose'
+}
