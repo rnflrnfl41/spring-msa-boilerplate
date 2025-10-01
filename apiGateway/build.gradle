@@ -1,6 +1,9 @@
 // 루트 프로젝트에서 plugins, group, version, repositories, dependencyManagement 상속
 
 dependencies {
+    // Common Library
+    implementation project(':commonLib')
+    
     // Spring Cloud Gateway
     implementation 'org.springframework.cloud:spring-cloud-starter-gateway'
     
