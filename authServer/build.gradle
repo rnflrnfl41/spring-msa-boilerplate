@@ -1,21 +1,26 @@
 // 루트 프로젝트에서 plugins, group, version, repositories, dependencyManagement 상속
 
 dependencies {
-    // Spring Security OAuth2 Authorization Server
-    implementation 'org.springframework.boot:spring-boot-starter-oauth2-authorization-server'
-    
-    // Spring Security
-    implementation 'org.springframework.boot:spring-boot-starter-security'
-    
-    // Spring Boot Web
+    // Common Library
+    implementation project(':commonLib')
+
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     
-    // Service Discovery (Eureka Client)
+    // Spring Security OAuth2 Authorization Server
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-authorization-server'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+
+    // JWT (토큰 발급/검증)
+    implementation 'org.springframework.security:spring-security-oauth2-jose'
+
+    //my sql
+    implementation 'mysql:mysql-connector-java:8.0.33'
+
+    //Eureka
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
     
     // Spring Boot Actuator (Health Check)
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
-    
-    // JWT
-    implementation 'org.springframework.security:spring-security-oauth2-jose'
 }
