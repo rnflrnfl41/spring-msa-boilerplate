@@ -2,3 +2,5 @@ rootProject.name = 'springMsaBoilerplate'
 
 include 'apiGateway'
 include 'authServer'
+include 'commonLib'
+include 'eurekaServer'
