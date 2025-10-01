@@ -1,0 +1,32 @@
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+
+    // JSON 처리
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+
+    // JWT
+    implementation 'com.nimbusds:nimbus-jose-jwt:9.37'
+
+    // Logging
+    implementation 'org.slf4j:slf4j-api:2.0.9'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+}
+
+// Spring Boot 테스트 의존성 제외 (라이브러리 모듈이므로)
+configurations {
+    testImplementation {
+        exclude group: 'org.springframework.boot', module: 'spring-boot-starter-test'
+    }
+}
+
+// JAR 파일 생성 활성화
+jar {
+    enabled = true
+    archiveClassifier = '' // 기본 JAR 파일 생성
+}
