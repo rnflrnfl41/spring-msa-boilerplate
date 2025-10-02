@@ -41,6 +41,13 @@ subprojects {
     //모든 프로젝트 공통 테스트 라이브러리
     dependencies {
         testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+        // Logging
+        implementation 'org.slf4j:slf4j-api:2.0.9'
+
+        // Lombok
+        compileOnly 'org.projectlombok:lombok:1.18.30'
+        annotationProcessor 'org.projectlombok:lombok:1.18.30'
     }
 
     //테스트 실행 방식 설정

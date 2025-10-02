@@ -1,0 +1,8 @@
+POST http://localhost:9090/oauth2/token
+Content-Type: application/x-www-form-urlencoded
+
+client_id=service-a-client&
+client_secret=service-a-secret&
+username=test@example.com&
+password=password&
+scope=read write

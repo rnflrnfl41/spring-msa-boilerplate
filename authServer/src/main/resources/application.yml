@@ -3,10 +3,12 @@ server:
 
 spring:
   application:
-    name: authServer
+    name: auth-server
 
   security:
     oauth2:
+      authorization-server:
+        issuer: http://localhost:9090  # OAuth2 표준: 고정 URL
       client:
         registration:
           google:
@@ -22,21 +24,22 @@ spring:
             token-uri: https://oauth2.googleapis.com/token
             user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
 
+  # 테스트용 H2 인메모리 데이터베이스 설정
   datasource:
-    url: ${AUTH_DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
-    driver-class-name: com.mysql.cj.jdbc.Driver
-
+    url: jdbc:h2:mem:testdb
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
 
   h2:
     console:
       enabled: true
+      path: /h2-console
 
   jpa:
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.MySQL8Dialect
+        dialect: org.hibernate.dialect.H2Dialect
         format_sql: true
         jdbc:
           batch_size: 20
@@ -45,19 +48,21 @@ spring:
     hibernate:
       naming:
         physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
-      ddl-auto: none
+      ddl-auto: create-drop  # 테스트용으로 테이블 자동 생성
     show-sql: true
 
 jwt:
   token:
-    key: ${JWT_SECRET}
+    key: ${JWT_SECRET:mySecretKey123456789012345678901234567890}
 
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
-      register-with-eureka: true
-      fetch-registry: true
+# Eureka 설정 제거 - OAuth2 표준에서는 직접 접근이 원칙
 
 security:
   internal-token: ${INTERNAL_TOKEN}
+
+# 디버깅을 위한 로그 설정
+logging:
+  level:
+    org.springframework.security: DEBUG
+    org.springframework.security.oauth2: DEBUG
+    com.example.authserver: DEBUG
