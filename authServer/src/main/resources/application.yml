@@ -12,8 +12,8 @@ spring:
       client:
         registration:
           google:
-            client-id: YOUR_GOOGLE_CLIENT_ID
-            client-secret: YOUR_GOOGLE_CLIENT_SECRET
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_SECRET_ID}
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
             scope:
               - openid
@@ -25,22 +25,19 @@ spring:
             token-uri: https://oauth2.googleapis.com/token
             user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
 
-  # 테스트용 H2 인메모리 데이터베이스 설정
   datasource:
-    url: jdbc:h2:mem:testdb
-    username: sa
-    password: 
-    driver-class-name: org.h2.Driver
+    url: ${TEST_DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
   h2:
     console:
       enabled: true
-      path: /h2-console
-
   jpa:
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
+        dialect: org.hibernate.dialect.MySQL8Dialect
         format_sql: true
         jdbc:
           batch_size: 20
@@ -49,14 +46,12 @@ spring:
     hibernate:
       naming:
         physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
-      ddl-auto: create-drop  # 테스트용으로 테이블 자동 생성
+      ddl-auto: none
     show-sql: true
 
 jwt:
   token:
-    key: ${JWT_SECRET:mySecretKey123456789012345678901234567890}
-
-# Eureka 설정 제거 - OAuth2 표준에서는 직접 접근이 원칙
+    key: ${JWT_SECRET}
 
 security:
   internal-token: ${INTERNAL_TOKEN}
