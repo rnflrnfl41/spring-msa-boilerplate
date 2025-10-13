@@ -73,12 +73,16 @@ public class SecurityConfig {
 
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/oauth2/token"))
+                .csrf(csrf -> csrf.ignoringRequestMatchers(
+                        "/oauth2/token",
+                        "/oauth2/introspect",
+                        "/oauth2/revoke")
+                )
                 .exceptionHandling(
                         ex ->
                                 ex.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"))
                 )
-                .formLogin(AbstractHttpConfigurer::disable)
+                .formLogin(form -> form.loginPage("/login"))
                 .build();
     }
 
@@ -94,30 +98,21 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/login", "/css/**", "/js/**", "/images/**").permitAll()
                         .requestMatchers("/api/auth/**", "/oauth2/**", "/.well-known/**", "/h2-console/**").permitAll()
-                        .anyRequest().authenticated())
-                .oauth2Login(oauth2 -> oauth2
-                        .userInfoEndpoint(userInfo -> userInfo.userService(oAuth2UserService()))
-                        .successHandler((req, res, authentication) -> {
-                            // ========================================
-                            // OAuth2 표준: 구글 로그인 성공 시 처리
-                            // ========================================
-                            // OAuth2 표준에 따라 Authorization Code를 생성하여 프론트엔드로 전달
-                            OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
-                            String email = oAuth2User.getAttribute("email");
-
-                            // Authorization Code 생성 (실제로는 DB에 저장해야 함)
-                            String code = generateAuthorizationCode(email);
-
-                            // Authorization Code 저장 (실제로는 AuthService를 주입받아서 사용해야 함)
-                            // authService.saveAuthorizationCode(authCode, email);
-
-                            // OAuth2 표준에 따라 프론트엔드로 Authorization Code 전달
-                            // 프론트엔드는 이 코드를 받아서 /oauth2/token에 토큰 요청
-                            res.sendRedirect("http://localhost:3000/callback?code=" + URLEncoder.encode(code, StandardCharsets.UTF_8));
-                        })
+                        .anyRequest().authenticated()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+                .formLogin(form -> form
+                        .loginPage("/login")                 // 커스텀 로그인 페이지 지정
+                        .loginProcessingUrl("/login")        // 로그인 form action 처리
+                        .defaultSuccessUrl("/", true)        // 로그인 성공 시 이동
+                        .failureUrl("/login?error=true")     // 로그인 실패 시 이동
+                        .permitAll()
+                )
+                .oauth2Login(oauth -> oauth
+                        .loginPage("/login")  // 구글/카카오 로그인도 이 화면에서
+                );
+
         return http.build();
     }
 
