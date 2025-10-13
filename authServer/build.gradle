@@ -26,4 +26,7 @@ dependencies {
     
     // Spring Boot Actuator (Health Check)
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    
+    // Thymeleaf (템플릿 엔진)
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 }
