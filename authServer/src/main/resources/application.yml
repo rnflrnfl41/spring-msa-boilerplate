@@ -48,27 +48,27 @@ spring:
   h2:
     console:
       enabled: true
-  jpa:
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.MySQL8Dialect
-        format_sql: true
-        jdbc:
-          batch_size: 20
-        order_updates: true
-        order_insert: true
-    hibernate:
-      naming:
-        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
-      ddl-auto: none
-    show-sql: true
+#  jpa:
+#    properties:
+#      hibernate:
+#        dialect: org.hibernate.dialect.MySQL8Dialect
+#        format_sql: true
+#        jdbc:
+#          batch_size: 20
+#        order_updates: true
+#        order_insert: true
+#    hibernate:
+#      naming:
+#        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+#      ddl-auto: none
+#    show-sql: true
 
-jwt:
-  token:
-    key: ${JWT_SECRET}
+#jwt:
+#  token:
+#    key: ${JWT_SECRET}
 
-security:
-  internal-token: ${INTERNAL_TOKEN}
+#security:
+#  internal-token: ${INTERNAL_TOKEN}
 
 # 디버깅을 위한 로그 설정
 logging:
