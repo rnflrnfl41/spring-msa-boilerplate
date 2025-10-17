@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
@@ -33,93 +34,112 @@ import java.util.UUID;
 public class AuthController {
 
     private final TokenService tokenService;
+    private final PasswordEncoder passwordEncoder;
 
     private final WebClient webClient = WebClient.create();
 
     /**
-     * Auth Server → BFF callback
+     * Auth Server → BFF callback (Authorization Code 받음)
+     * 표준 OAuth2 Authorization Code Flow
      */
     @GetMapping("/callback")
-    public ResponseEntity<?> callback(
-            @RequestParam("code") String code,
+    public void callback(
+            @RequestParam(value = "code", required = false) String code,
+            @RequestParam(value = "state", required = false) String state,
+            @RequestParam(value = "error", required = false) String error,
             HttpServletResponse response
     ) {
         try {
-            // 1️⃣ Auth Server로 토큰 교환 요청
+            // 1️⃣ 에러 체크
+            if (error != null) {
+                log.error("❌ OAuth2 에러: {}", error);
+                response.sendRedirect("http://localhost:3000?login=failed&error=" + error);
+                return;
+            }
+
+            // 2️⃣ Authorization Code 체크
+            if (code == null) {
+                log.error("❌ Authorization Code 없음");
+                response.sendRedirect("http://localhost:3000?login=failed&error=no_authorization_code");
+                return;
+            }
+
+            // 3️⃣ Authorization Code로 토큰 교환 (Spring Security OAuth2 Authorization Server 사용)
             Map<String, String> tokenResponse = webClient.post()
                     .uri("http://localhost:9090/oauth2/token")
                     .headers(headers -> headers.setBasicAuth("bff-client", "bff-secret"))
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
                     .body(BodyInserters.fromFormData("grant_type", "authorization_code")
                             .with("code", code)
-                            .with("redirect_uri", "http://localhost:9091/api/auth/callback"))
+                            .with("redirect_uri", "http://localhost:9091/api/auth/callback")
+                            .with("client_id", "bff-client"))
                     .retrieve()
                     .bodyToMono(new ParameterizedTypeReference<Map<String, String>>() {})
                     .block();
 
             if (tokenResponse == null || !tokenResponse.containsKey("access_token")) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(Map.of("success", false, "error", "토큰 응답 없음"));
+                log.error("❌ 토큰 교환 실패");
+                response.sendRedirect("http://localhost:3000?login=failed&error=token_exchange_failed");
+                return;
             }
 
-            String accessToken = tokenResponse.get("access_token");
-            String refreshToken = tokenResponse.get("refresh_token");
-
-            // 2️⃣ Redis에 세션 저장
+            // 4️⃣ 토큰을 세션으로 저장
             String sessionId = UUID.randomUUID().toString();
             TokenResponse tokenObj = new TokenResponse();
-            tokenObj.setAccessToken(accessToken);
-            tokenObj.setRefreshToken(refreshToken);
+            tokenObj.setAccessToken(tokenResponse.get("access_token"));
+            tokenObj.setRefreshToken(tokenResponse.get("refresh_token"));
             tokenObj.setTokenType(tokenResponse.get("token_type"));
             tokenObj.setExpiresIn(Long.valueOf(tokenResponse.get("expires_in")));
             tokenObj.setScope(tokenResponse.get("scope"));
 
-            tokenService.saveToken(sessionId, tokenObj); // Redis 저장 로직
+            tokenService.saveToken(sessionId, tokenObj);
 
-            // 3️⃣ SPA에 sessionId 쿠키 전달
+            // 5️⃣ SPA에 sessionId 쿠키 전달
             Cookie sessionCookie = new Cookie("SESSION_ID", sessionId);
             sessionCookie.setHttpOnly(true);
             sessionCookie.setPath("/");
             sessionCookie.setMaxAge(7 * 24 * 60 * 60); // 7일
             response.addCookie(sessionCookie);
 
-            return ResponseEntity.ok(Map.of("success", true, "message", "로그인 성공"));
+            // 6️⃣ SPA로 성공 리다이렉트
+            response.sendRedirect("http://localhost:3000?login=success");
 
         } catch (Exception e) {
             log.error("❌ 로그인 콜백 처리 실패: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("success", false, "error", e.getMessage()));
+            try {
+                response.sendRedirect("http://localhost:3000?login=error");
+            } catch (IOException ioException) {
+                log.error("❌ 리다이렉트 실패: {}", ioException.getMessage());
+            }
         }
     }
 
-    /**
-     * SPA → BFF → API 요청
-     */
-    @GetMapping("/userinfo")
-    public ResponseEntity<?> userinfo(@CookieValue("ACCESS_TOKEN") String token) {
-        Map<String, Object> userinfo = webClient.get()
-                .uri("http://localhost:9090/userinfo")
-                .headers(h -> h.setBearerAuth(token))
-                .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-                .block();
-
-        return ResponseEntity.ok(userinfo);
-    }
 
     /**
-     * 1️⃣ SPA → BFF → Auth Server (Authorization Request)
-     * SPA가 로그인 버튼 클릭 → BFF 서버의 /login으로 리다이렉트
-     * BFF 서버가 Auth Server의 OAuth2 Client로 동작
+     * 1️⃣ SPA → BFF (로그인 요청)
+     * 세션 검증 후 없으면 OAuth2 Authorization Server로 리다이렉트
      */
     @GetMapping("/login")
-    public void login(HttpServletResponse response) {
+    public void login(HttpServletRequest request, HttpServletResponse response) {
         try {
+            // 1️⃣ 세션 검증
+            String sessionId = getSessionIdFromCookie(request);
+            if (sessionId != null) {
+                String accessToken = tokenService.getAccessToken(sessionId);
+                if (accessToken != null) {
+                    // 이미 로그인된 상태 - SPA로 리다이렉트
+                    response.sendRedirect("http://localhost:3000?login=already");
+                    return;
+                }
+            }
+
+            // 2️⃣ 세션이 없으면 OAuth2 Authorization Server로 리다이렉트
             String authorizeUrl = UriComponentsBuilder.fromUriString("http://localhost:9090/oauth2/authorize")
                     .queryParam("response_type", "code")
                     .queryParam("client_id", "bff-client")
                     .queryParam("redirect_uri", "http://localhost:9091/api/auth/callback")
                     .queryParam("scope", "openid profile email")
+                    .queryParam("state", UUID.randomUUID().toString()) // CSRF 방지
                     .build().toUriString();
 
             response.sendRedirect(authorizeUrl);
@@ -130,8 +150,8 @@ public class AuthController {
 
 
     /**
-     * 4️⃣ SPA → BFF → API 서버 (Access)
-     * SPA는 로그인 후 BFF의 엔드포인트 호출 (예: /api/user/me)
+     * 4️⃣ SPA → BFF (로그인 상태 확인)
+     * SPA가 리다이렉트된 후 로그인 상태를 확인
      */
     @GetMapping("/status")
     public ResponseEntity<Map<String, Object>> getStatus(HttpServletRequest request) {
@@ -147,18 +167,6 @@ public class AuthController {
 
             String accessToken = tokenService.getAccessToken(sessionId);
             if (accessToken == null) {
-                // Refresh Token으로 토큰 갱신 시도
-                String refreshToken = tokenService.getRefreshToken(sessionId);
-                if (refreshToken != null) {
-                    TokenResponse newTokenResponse = tokenService.refreshToken(refreshToken);
-                    if (newTokenResponse != null) {
-                        tokenService.saveToken(sessionId, newTokenResponse);
-                        accessToken = newTokenResponse.getAccessToken();
-                    }
-                }
-            }
-
-            if (accessToken == null) {
                 result.put("authenticated", false);
                 result.put("message", "토큰 없음");
                 return ResponseEntity.ok(result);
@@ -166,6 +174,7 @@ public class AuthController {
 
             result.put("authenticated", true);
             result.put("message", "인증됨");
+            result.put("sessionId", sessionId);
             return ResponseEntity.ok(result);
 
         } catch (Exception e) {
