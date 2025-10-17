@@ -1,12 +1,11 @@
 package com.example.authserver.config;
 
+import com.example.authserver.service.CustomOidcUserService;
 import com.example.util.Jwk;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
-import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,10 +14,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
-import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
@@ -26,12 +24,8 @@ import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
-import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.user.OAuth2User;
-import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
@@ -50,16 +44,22 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import com.example.authserver.handler.OAuth2LoginSuccessHandler;
 
 import java.time.Duration;
 import java.util.*;
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
+
+    private final OAuth2LoginSuccessHandler oauth2LoginSuccessHandler;
 
     // ========================================
     // OAuth2 Authorization Server 필터 체인
@@ -90,16 +90,15 @@ public class SecurityConfig {
                         "/oauth2/introspect",
                         "/oauth2/revoke")
                 )
-                .formLogin(form -> form.loginPage("/login"))
-                .requestCache(RequestCacheConfigurer::disable);
+                .formLogin(form -> form.loginPage("/login"));
 
         return http.build();
     }
 
     // ========================================
-    // OAuth2 Client + Resource Server 필터 체인
+    // OAuth2 Authorization Server 필터 체인
     // ========================================
-    // 구글/카카오 등 소셜 로그인을 처리하는 OAuth2 Client 역할
+    // BFF가 Authorization Code를 받을 수 있도록 설정
     @Bean
     @Order(2)
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
@@ -107,23 +106,21 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login", "/css/**", "/js/**", "/images/**",
-                                "/.well-known/**", "/h2-console/**", "/userinfo").permitAll()
+                        .requestMatchers("/login", "/login/**", "/css/**", "/js/**", "/images/**",
+                                "/.well-known/**", "/h2-console/**", 
+                                "/oauth2/token", "/oauth2/jwks", "/userinfo").permitAll()
                         .anyRequest().authenticated()
                 )
-                .oauth2Login(oauth2 -> oauth2
+                .formLogin(form -> form
                         .loginPage("/login")
-                        .userInfoEndpoint(userInfo -> userInfo
-                                .oidcUserService(this.oidcUserService())
-                                .userService(this.oauth2UserService())
-                        )
-                        .successHandler((request, response, authentication) -> {
-                            response.sendRedirect("http://localhost:9091/api/auth/callback?code=" + request.getParameter("code"));
-                        })
+                        .permitAll()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt
-                                .jwkSetUri("http://localhost:9090/.well-known/jwks.json")
+                .oauth2Login(oauth2 -> oauth2
+                        // Spring이 제공하는 endpoint: /oauth2/authorization/{registrationId}
+                        .loginPage("/login")
+                        .successHandler(oauth2LoginSuccessHandler) // Google 로그인 성공 시 원래 authorization request 복귀
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .oidcUserService(customOidcUserService()) // 커스텀 OIDC 사용자 서비스
                         )
                 );
 
@@ -160,7 +157,7 @@ public class SecurityConfig {
         // === BFF Client (auth-gateway) ===
         RegisteredClient bffClient = RegisteredClient.withId(UUID.randomUUID().toString())
                 .clientId("bff-client")
-                .clientSecret("{noop}bff-secret")
+                .clientSecret("{noop}bff-secret") // 평문으로 저장 (개발 환경용)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 .redirectUri("http://localhost:9091/api/auth/callback") // BFF가 code 받는 URI
@@ -199,7 +196,12 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return NoOpPasswordEncoder.getInstance();
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public CustomOidcUserService customOidcUserService() {
+        return new CustomOidcUserService();
     }
 
     @Bean
@@ -216,54 +218,8 @@ public class SecurityConfig {
         return new JdbcOAuth2AuthorizationConsentService(jdbcTemplate, registeredClientRepository);
     }
 
-    // ✅ OIDC 전용 (구글)
-    private OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService() {
-        OidcUserService delegate = new OidcUserService();
-        return userRequest -> {
-            OidcUser oidcUser = delegate.loadUser(userRequest);
-            System.out.println("✅ OIDC 로그인 사용자: " + oidcUser.getEmail());
-            return oidcUser;
-        };
-    }
 
-    // ✅ 일반 OAuth2 전용 (카카오)
-    private OAuth2UserService<OAuth2UserRequest, OAuth2User> oauth2UserService() {
-        DefaultOAuth2UserService delegate = new DefaultOAuth2UserService();
-        return userRequest -> {
-            OAuth2User oAuth2User = delegate.loadUser(userRequest);
-            System.out.println("✅ OAuth2 로그인 사용자: " + oAuth2User.getAttributes());
-            return oAuth2User;
-        };
-    }
 
-    // ========================================
-    // OAuth2 로그인 성공 핸들러
-    // ========================================
-    // 소셜 로그인 성공 시 사용자 정보를 JWT로 변환하여 BFF로 리다이렉트
-    private AuthenticationSuccessHandler oauth2SuccessHandler() {
-        return (request, response, authentication) -> {
-            OAuth2AuthenticationToken token = (OAuth2AuthenticationToken) authentication;
-            
-            // 사용자 정보 추출
-            String email = null;
-            String name = null;
-            
-            if (token.getPrincipal() instanceof OidcUser) {
-                OidcUser oidcUser = (OidcUser) token.getPrincipal();
-                email = oidcUser.getEmail();
-                name = oidcUser.getFullName();
-            } else if (token.getPrincipal() instanceof OAuth2User) {
-                OAuth2User oAuth2User = (OAuth2User) token.getPrincipal();
-                email = oAuth2User.getAttribute("email");
-                name = oAuth2User.getAttribute("name");
-            }
-            
-            System.out.println("✅ 소셜 로그인 성공: " + email + " (" + name + ")");
-
-            // 로그인 성공 후 BFF로 바로 redirect
-            response.sendRedirect("http://localhost:9091/login/oauth2/code/auth-server");
-        };
-    }
 
 
     // ========================================
