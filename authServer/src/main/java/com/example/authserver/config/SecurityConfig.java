@@ -117,6 +117,12 @@ public class SecurityConfig {
                         .userInfoEndpoint(userInfo -> userInfo
                                 .oidcUserService(customOidcUserService()) // 커스텀 OIDC 사용자 서비스
                         )
+                )
+                .logout(logout -> logout
+                        .logoutUrl("/logout")
+                        .invalidateHttpSession(true)
+                        .deleteCookies("JSESSIONID")
+                        .permitAll()
                 );
 
         return http.build();
