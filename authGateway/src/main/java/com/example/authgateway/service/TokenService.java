@@ -2,10 +2,14 @@ package com.example.authgateway.service;
 
 import com.example.authgateway.dto.TokenResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nimbusds.jwt.JWT;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.JWTParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.*;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -13,6 +17,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -24,6 +29,7 @@ public class TokenService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * OAuth2 Authorization Server에서 토큰 교환
@@ -151,32 +157,71 @@ public class TokenService {
     }
 
     /**
-     * 사용자 정보 조회
+     * 사용자 정보 조회 (JWT 토큰에서 직접 추출)
+     * Auth Server의 세션 기반이 아닌 JWT 토큰 기반으로 처리
      */
     public Map<String, Object> getUserInfo(String accessToken) {
         try {
-            String userInfoUrl = "http://localhost:9090/userinfo";
+            // 1️⃣ JWT 토큰 파싱
+            JWT jwt = JWTParser.parse(accessToken);
+            JWTClaimsSet claimsSet = jwt.getJWTClaimsSet();
             
-            HttpHeaders headers = new HttpHeaders();
-            headers.setBearerAuth(accessToken);
-            
-            HttpEntity<String> request = new HttpEntity<>(headers);
-            
-            ResponseEntity<Map> response = restTemplate.exchange(
-                userInfoUrl, 
-                HttpMethod.GET, 
-                request, 
-                Map.class
-            );
-            
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                log.info("✅ 사용자 정보 조회 성공");
-                return response.getBody();
+            // 2️⃣ 토큰 유효성 검증
+            if (isTokenExpired(claimsSet)) {
+                log.error("❌ JWT 토큰 만료됨");
+                return null;
             }
+            
+            // 3️⃣ 발급자 검증 (Auth Server에서 발급된 토큰인지 확인)
+            String issuer = claimsSet.getIssuer();
+            if (issuer == null || !issuer.equals("http://localhost:9090")) {
+                log.error("❌ 잘못된 토큰 발급자: {}", issuer);
+                return null;
+            }
+            
+            // 4️⃣ 사용자 정보 추출
+            Map<String, Object> userInfo = new HashMap<>();
+            
+            // 표준 JWT Claims
+            String sub = claimsSet.getSubject();
+            String email = claimsSet.getStringClaim("email");
+            String name = claimsSet.getStringClaim("name");
+            String picture = claimsSet.getStringClaim("picture");
+            Boolean emailVerified = claimsSet.getBooleanClaim("email_verified");
+            
+            // 사용자 정보 설정
+            userInfo.put("sub", sub != null ? sub : "unknown");
+            userInfo.put("email", email != null ? email : "unknown@example.com");
+            userInfo.put("name", name != null ? name : "Unknown User");
+            userInfo.put("picture", picture != null ? picture : "https://example.com/default-avatar.jpg");
+            userInfo.put("email_verified", emailVerified != null ? emailVerified : false);
+            
+            // 추가 정보 (발급자, 만료시간 등)
+            userInfo.put("issuer", claimsSet.getIssuer());
+            userInfo.put("issued_at", claimsSet.getIssueTime());
+            userInfo.put("expires_at", claimsSet.getExpirationTime());
+            
+            log.info("✅ 사용자 정보 조회 성공 (JWT 기반): {} ({})", name, email);
+            return userInfo;
+            
         } catch (Exception e) {
-            log.error("❌ 사용자 정보 조회 실패: {}", e.getMessage());
+            log.error("❌ JWT 토큰 파싱 실패: {}", e.getMessage());
+            
+            // JWT 파싱 실패 시 null 반환 (보안상 fallback 데이터 사용하지 않음)
+            return null;
         }
-        return null;
+    }
+    
+    /**
+     * JWT 토큰 만료 여부 확인
+     */
+    private boolean isTokenExpired(JWTClaimsSet claimsSet) {
+        try {
+            return claimsSet.getExpirationTime().before(new java.util.Date());
+        } catch (Exception e) {
+            log.error("❌ 토큰 만료 시간 확인 실패: {}", e.getMessage());
+            return true; // 확인할 수 없으면 만료된 것으로 처리
+        }
     }
 
 }

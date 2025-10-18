@@ -28,22 +28,22 @@ spring:
           min-idle: 0
 
   # OAuth2 Client 설정 (BFF가 Auth Server의 클라이언트)
-#  security:
-#    oauth2:
-#      client:
-#        registration:
-#          auth-server:
-#            client-id: bff-client
-#            client-secret: "bff-secret"
-#            authorization-grant-type: authorization_code
-#            redirect-uri: "http://localhost:9091/login/oauth2/code/auth-server"
-#            scope: openid,profile,email
-#        provider:
-#          auth-server:
-#            authorization-uri: http://localhost:9090/oauth2/authorize
-#            token-uri: http://localhost:9090/oauth2/token
-#            user-info-uri: http://localhost:9090/userinfo
-#            jwk-set-uri: http://localhost:9090/.well-known/jwks.json
+  security:
+    oauth2:
+      client:
+        registration:
+          auth-server:
+            client-id: bff-client
+            client-secret: "bff-secret"
+            authorization-grant-type: authorization_code
+            redirect-uri: "http://localhost:9091/api/auth/callback"
+            scope: openid,profile,email
+        provider:
+          auth-server:
+            authorization-uri: http://localhost:9090/oauth2/authorize
+            token-uri: http://localhost:9090/oauth2/token
+            user-info-uri: http://localhost:9090/userinfo
+            jwk-set-uri: http://localhost:9090/.well-known/jwks.json
 
 # 로깅 설정
 logging:
