@@ -158,7 +158,6 @@ public class TokenService {
 
     /**
      * 사용자 정보 조회 (JWT 토큰에서 직접 추출)
-     * Auth Server의 세션 기반이 아닌 JWT 토큰 기반으로 처리
      */
     public Map<String, Object> getUserInfo(String accessToken) {
         try {

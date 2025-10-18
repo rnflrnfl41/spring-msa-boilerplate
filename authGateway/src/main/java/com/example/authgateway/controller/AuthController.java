@@ -114,7 +114,6 @@ public class AuthController {
         }
     }
 
-
     /**
      * 1️⃣ SPA → BFF (로그인 요청)
      * 세션 검증 후 없으면 OAuth2 Authorization Server로 리다이렉트
@@ -147,7 +146,6 @@ public class AuthController {
             log.error("❌ 로그인 리다이렉트 실패: {}", e.getMessage());
         }
     }
-
 
     /**
      * 4️⃣ SPA → BFF (로그인 상태 확인)
@@ -232,31 +230,52 @@ public class AuthController {
      */
     @PostMapping("/logout")
     public ResponseEntity<Map<String, Object>> logout(HttpServletRequest request, HttpServletResponse response) {
+
         Map<String, Object> result = new HashMap<>();
 
         try {
+            // 1️⃣ BFF 세션/쿠키 삭제
             String sessionId = getSessionIdFromCookie(request);
             if (sessionId != null) {
                 tokenService.deleteSession(sessionId);
 
-                // 쿠키 삭제
-                Cookie sessionCookie = new Cookie("SESSION_ID", null);
-                sessionCookie.setHttpOnly(true);
-                sessionCookie.setPath("/");
-                sessionCookie.setMaxAge(0);
-                response.addCookie(sessionCookie);
+                Cookie cookie = new Cookie("SESSION_ID", null);
+                cookie.setHttpOnly(true);
+                cookie.setPath("/");
+                cookie.setMaxAge(0);
+                response.addCookie(cookie);
             }
 
+            // 2️⃣ Auth Server 세션 무효화
+            try {
+                webClient.get()
+                        .uri(uriBuilder -> uriBuilder
+                                .scheme("http")
+                                .host("localhost")
+                                .port(9090)
+                                .path("/logout")
+                                .queryParam("post_logout_redirect_uri", "http://localhost:3000?logout=success")
+                                .build())
+                        .cookie("JSESSIONID", getAuthServerSessionIdFromCookie(request))
+                        .retrieve()
+                        .toBodilessEntity()
+                        .block();
+            } catch (Exception e) {
+                log.warn("Auth Server 로그아웃 실패: {}", e.getMessage());
+            }
+
+            // 3️⃣ JSON 응답 반환
             result.put("success", true);
-            result.put("message", "로그아웃 성공");
+            result.put("message", "로그아웃 완료");
             return ResponseEntity.ok(result);
 
         } catch (Exception e) {
-            log.error("❌ 로그아웃 실패: {}", e.getMessage());
+            log.error("❌ 로그아웃 중 오류: {}", e.getMessage());
             result.put("success", false);
             result.put("error", e.getMessage());
-            return ResponseEntity.internalServerError().body(result);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
         }
+
     }
 
     /**
@@ -266,6 +285,17 @@ public class AuthController {
         if (request.getCookies() != null) {
             for (Cookie cookie : request.getCookies()) {
                 if ("SESSION_ID".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
+    }
+
+    private String getAuthServerSessionIdFromCookie(HttpServletRequest request) {
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("JSESSIONID".equals(cookie.getName())) {
                     return cookie.getValue();
                 }
             }

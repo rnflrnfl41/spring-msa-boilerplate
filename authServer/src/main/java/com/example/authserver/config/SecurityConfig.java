@@ -14,18 +14,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
-import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
-import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
-import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
-import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
-import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
@@ -44,12 +35,11 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
-import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
-import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import com.example.authserver.handler.OAuth2LoginSuccessHandler;
+import com.example.authserver.handler.FormLoginSuccessHandler;
 
 import java.time.Duration;
 import java.util.*;
@@ -60,6 +50,7 @@ import java.util.*;
 public class SecurityConfig {
 
     private final OAuth2LoginSuccessHandler oauth2LoginSuccessHandler;
+    private final FormLoginSuccessHandler formLoginSuccessHandler;
 
     // ========================================
     // OAuth2 Authorization Server 필터 체인
@@ -90,7 +81,10 @@ public class SecurityConfig {
                         "/oauth2/introspect",
                         "/oauth2/revoke")
                 )
-                .formLogin(form -> form.loginPage("/login"));
+                .formLogin(form -> form
+                        .loginPage("/login")
+                        .successHandler(formLoginSuccessHandler)
+                );
 
         return http.build();
     }
@@ -106,13 +100,14 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login", "/login/**", "/css/**", "/js/**", "/images/**",
+                        .requestMatchers("/error","/login", "/login/**", "/css/**", "/js/**", "/images/**",
                                 "/.well-known/**", "/h2-console/**", 
                                 "/oauth2/token", "/oauth2/jwks", "/userinfo").permitAll()
                         .anyRequest().authenticated()
                 )
                 .formLogin(form -> form
                         .loginPage("/login")
+                        .successHandler(formLoginSuccessHandler)
                         .permitAll()
                 )
                 .oauth2Login(oauth2 -> oauth2
@@ -122,6 +117,12 @@ public class SecurityConfig {
                         .userInfoEndpoint(userInfo -> userInfo
                                 .oidcUserService(customOidcUserService()) // 커스텀 OIDC 사용자 서비스
                         )
+                )
+                .logout(logout -> logout
+                        .logoutUrl("/logout")
+                        .invalidateHttpSession(true)
+                        .deleteCookies("JSESSIONID")
+                        .permitAll()
                 );
 
         return http.build();
@@ -151,13 +152,13 @@ public class SecurityConfig {
 
     // OAuth2 Client 등록
     @Bean
-    public RegisteredClientRepository registeredClientRepository() {
+    public RegisteredClientRepository registeredClientRepository(PasswordEncoder passwordEncoder) {
         List<RegisteredClient> clients = new ArrayList<>();
 
         // === BFF Client (auth-gateway) ===
         RegisteredClient bffClient = RegisteredClient.withId(UUID.randomUUID().toString())
                 .clientId("bff-client")
-                .clientSecret("{noop}bff-secret") // 평문으로 저장 (개발 환경용)
+                .clientSecret(passwordEncoder.encode("bff-secret"))
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 .redirectUri("http://localhost:9091/api/auth/callback") // BFF가 code 받는 URI
@@ -179,7 +180,6 @@ public class SecurityConfig {
 
         System.out.println("Registered clientSecret: " + bffClient.getClientSecret());
 
-        // 여기 나중에 Google, Kakao 같은 소셜 로그인 client도 추가 가능
         return new InMemoryRegisteredClientRepository(clients);
     }
 
