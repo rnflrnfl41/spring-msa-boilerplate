@@ -24,6 +24,8 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                                         Authentication authentication) throws IOException, ServletException {
+
+        String baseRedirectUrl = "localhost:3000/dashboard";
         
         log.info("OAuth2 로그인 성공: {}", authentication.getName());
         
@@ -46,6 +48,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         } else {
             // 저장된 요청이 없으면 기본 페이지로 리다이렉트
             log.info("저장된 요청 없음, 기본 페이지로 리다이렉트");
+            getRedirectStrategy().sendRedirect(request, response, baseRedirectUrl);
             super.onAuthenticationSuccess(request, response, authentication);
         }
     }
