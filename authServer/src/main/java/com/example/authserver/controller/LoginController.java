@@ -3,30 +3,15 @@ package com.example.authserver.controller;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
 @Controller
 public class LoginController {
-
-    private final RestTemplate restTemplate = new RestTemplate();
 
     @GetMapping("/login")
     public String loginPage() {
@@ -48,6 +33,7 @@ public class LoginController {
             Object principal = authentication.getPrincipal();
             
             if (principal instanceof OidcUser) {
+                // Google OIDC 사용자
                 OidcUser oidcUser = (OidcUser) principal;
                 userInfo.put("sub", oidcUser.getSubject());
                 userInfo.put("email", oidcUser.getEmail());
@@ -56,6 +42,14 @@ public class LoginController {
                 userInfo.put("family_name", oidcUser.getFamilyName());
                 userInfo.put("picture", oidcUser.getPicture() != null ? oidcUser.getPicture().toString() : null);
                 userInfo.put("email_verified", oidcUser.getEmailVerified());
+            } else if (principal instanceof OAuth2User) {
+                // 카카오 OAuth2 사용자
+                OAuth2User oauth2User = (OAuth2User) principal;
+                userInfo.put("sub", oauth2User.getAttribute("sub"));
+                userInfo.put("email", oauth2User.getAttribute("email"));
+                userInfo.put("name", oauth2User.getAttribute("name"));
+                userInfo.put("picture", oauth2User.getAttribute("picture"));
+                userInfo.put("email_verified", oauth2User.getAttribute("email_verified"));
             } else {
                 // 일반 사용자 (폼 로그인)
                 userInfo.put("sub", authentication.getName());
