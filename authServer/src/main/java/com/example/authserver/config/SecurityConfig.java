@@ -1,6 +1,7 @@
 package com.example.authserver.config;
 
 import com.example.authserver.service.CustomOidcUserService;
+import com.example.authserver.service.CustomOAuth2UserService;
 import com.example.util.Jwk;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
@@ -115,7 +116,8 @@ public class SecurityConfig {
                         .loginPage("/login")
                         .successHandler(oauth2LoginSuccessHandler) // Google 로그인 성공 시 원래 authorization request 복귀
                         .userInfoEndpoint(userInfo -> userInfo
-                                .oidcUserService(customOidcUserService()) // 커스텀 OIDC 사용자 서비스
+                                .oidcUserService(customOidcUserService()) // Google용 OIDC 사용자 서비스
+                                .userService(customOAuth2UserService()) // 카카오용 OAuth2 사용자 서비스
                         )
                 )
                 .logout(logout -> logout
@@ -202,6 +204,11 @@ public class SecurityConfig {
     @Bean
     public CustomOidcUserService customOidcUserService() {
         return new CustomOidcUserService();
+    }
+
+    @Bean
+    public CustomOAuth2UserService customOAuth2UserService() {
+        return new CustomOAuth2UserService();
     }
 
     @Bean
