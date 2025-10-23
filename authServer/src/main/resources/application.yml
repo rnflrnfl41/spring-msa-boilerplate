@@ -1,14 +1,13 @@
-server:
-  port: 9090
-
 spring:
+  config:
+    import: "classpath:application-common.yml"
   application:
-    name: auth-server
+    name: ${app.service-names.auth-server}
 
   security:
     oauth2:
       authorization-server:
-        issuer: http://localhost:9090  # OAuth2 표준: 고정 URL
+        issuer: ${app.base-url}:${app.ports.auth-server}
       client:
         registration:
           google:
@@ -71,6 +70,9 @@ spring:
 
 #security:
 #  internal-token: ${INTERNAL_TOKEN}
+
+server:
+  port: ${app.ports.auth-server}
 
 # 디버깅을 위한 로그 설정
 logging:
