@@ -1,14 +1,15 @@
-server:
-  port: 9091
-
 spring:
+
+  config:
+    import: "classpath:application-common.yml"
+
   application:
-    name: authGateway
+    name: ${app.service-names.auth-gateway}
   
   # CORS 설정
   web:
     cors:
-      allowed-origins: "http://localhost:3000"
+      allowed-origins: "${app.base-url}:${app.ports.frontend}"
       allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
       allowed-headers: "*"
       allow-credentials: true
@@ -36,14 +37,17 @@ spring:
             client-id: bff-client
             client-secret: "bff-secret"
             authorization-grant-type: authorization_code
-            redirect-uri: "http://localhost:9091/api/auth/callback"
+            redirect-uri: "${app.base-url}:${app.ports.auth-gateway}/api/auth/callback"
             scope: openid,profile,email
         provider:
           auth-server:
-            authorization-uri: http://localhost:9090/oauth2/authorize
-            token-uri: http://localhost:9090/oauth2/token
-            user-info-uri: http://localhost:9090/userinfo
-            jwk-set-uri: http://localhost:9090/.well-known/jwks.json
+            authorization-uri: "${app.base-url}:${app.ports.auth-server}/oauth2/authorize"
+            token-uri: "${app.base-url}:${app.ports.auth-server}/oauth2/token"
+            user-info-uri: "${app.base-url}:${app.ports.auth-server}/userinfo"
+            jwk-set-uri: "${app.base-url}:${app.ports.auth-server}/.well-known/jwks.json"
+
+server:
+  port: ${app.ports.auth-gateway}
 
 # 로깅 설정
 logging:

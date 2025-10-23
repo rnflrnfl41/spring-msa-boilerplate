@@ -1,0 +1,26 @@
+# 공통 설정 파일 - 모든 서비스에서 참조
+app:
+  # 서버 포트 설정
+  ports:
+    auth-server: 9090
+    auth-gateway: 9091
+    api-gateway: 8080
+    eureka: 8761
+    frontend: 3000
+  
+  # 기본 URL
+  base-url: http://localhost
+  
+  # 서비스 이름
+  service-names:
+    auth-server: auth-server
+    auth-gateway: authGateway
+    api-gateway: apiGateway
+    eureka: eurekaServer
+  
+  # 환경별 설정
+  environments:
+    dev:
+      base-url: http://localhost
+    prod:
+      base-url: https://your-domain.com
