@@ -1,11 +1,13 @@
-server:
-  port: 8761
-
 spring:
+  config:
+    import: "classpath:application-common.yml"
   application:
-    name: eurekaServer
+    name: ${app.service-names.eureka}
+
+server:
+  port: ${app.ports.eureka}
 
 eureka:
   client:
-    register-with-eureka: false # ?? ??? ???? ??
-    fetch-registry: false # ?? ??? ??? ???? ??
+    register-with-eureka: false
+    fetch-registry: false
