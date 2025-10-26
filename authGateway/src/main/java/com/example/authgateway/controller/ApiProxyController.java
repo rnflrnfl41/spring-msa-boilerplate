@@ -73,7 +73,7 @@ public class ApiProxyController {
                         .body(Map.of("error", "토큰 없음"));
             }
 
-            // API 서버 URL 구성 (예: http://localhost:8080)
+            // API 서버 URL 구성
             String apiServerUrl = "http://localhost:8080";
             String requestPath = request.getRequestURI().replace("/api/proxy", "");
             String targetUrl = apiServerUrl + requestPath;
