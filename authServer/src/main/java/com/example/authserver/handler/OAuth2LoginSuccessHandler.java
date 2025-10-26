@@ -1,5 +1,6 @@
 package com.example.authserver.handler;
 
+import com.example.Constants.Constants;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -25,7 +26,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                                         Authentication authentication) throws IOException, ServletException {
 
-        String baseRedirectUrl = "localhost:3000/dashboard";
+        String baseRedirectUrl = Constants.getFrontendDashBoardUrl();
         
         log.info("OAuth2 로그인 성공: {}", authentication.getName());
         
