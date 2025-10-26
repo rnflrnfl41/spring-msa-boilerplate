@@ -1,5 +1,6 @@
 package com.example.authserver.config;
 
+import com.example.Constants.Constants;
 import com.example.authserver.service.CustomOidcUserService;
 import com.example.authserver.service.CustomOAuth2UserService;
 import com.example.util.Jwk;
@@ -140,8 +141,8 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(Arrays.asList(
-                "http://localhost:3000",  // SPA
-                "http://localhost:9091"  // BFF 서버
+                Constants.getFrontendUrl(),  // SPA
+                Constants.getAuthGatewayUrl()  // BFF 서버
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
@@ -163,7 +164,7 @@ public class SecurityConfig {
                 .clientSecret(passwordEncoder.encode("bff-secret"))
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-                .redirectUri("http://localhost:9091/api/auth/callback") // BFF가 code 받는 URI
+                .redirectUri(Constants.getAuthGatewayCallbackUrl()) // BFF가 code 받는 URI
                 .scope("openid")
                 .scope("profile")
                 .scope("email")
@@ -256,7 +257,7 @@ public class SecurityConfig {
     @Bean
     public AuthorizationServerSettings authorizationServerSettings() {
         return AuthorizationServerSettings.builder()
-                .issuer("http://localhost:9090") // OAuth2 표준: 고정 URL
+                .issuer(Constants.getAuthServerUrl()) // OAuth2 표준: 고정 URL
                 .build();
     }
 
