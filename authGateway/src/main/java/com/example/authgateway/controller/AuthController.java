@@ -1,7 +1,10 @@
 package com.example.authgateway.controller;
 
+import com.example.Constants.ErrorCode;
+import com.example.Constants.LoginResult;
 import com.example.authgateway.dto.TokenResponse;
 import com.example.authgateway.service.TokenService;
+import com.example.Constants.Constants;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -12,11 +15,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -24,13 +24,13 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Slf4j
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class AuthController {
 
     private final TokenService tokenService;
@@ -53,25 +53,25 @@ public class AuthController {
             // 1️⃣ 에러 체크
             if (error != null) {
                 log.error("❌ OAuth2 에러: {}", error);
-                response.sendRedirect("http://localhost:3000?login=failed&error=" + error);
+                response.sendRedirect(buildFrontendRedirectUrl(LoginResult.FAILED,error));
                 return;
             }
 
             // 2️⃣ Authorization Code 체크
             if (code == null) {
                 log.error("❌ Authorization Code 없음");
-                response.sendRedirect("http://localhost:3000?login=failed&error=no_authorization_code");
+                response.sendRedirect(buildFrontendRedirectUrl(LoginResult.FAILED, ErrorCode.NO_AUTHORIZATION_CODE));
                 return;
             }
 
             // 3️⃣ Authorization Code로 토큰 교환 (Spring Security OAuth2 Authorization Server 사용)
             Map<String, String> tokenResponse = webClient.post()
-                    .uri("http://localhost:9090/oauth2/token")
+                    .uri(Constants.getAuthServerTokenUrl())
                     .headers(headers -> headers.setBasicAuth("bff-client", "bff-secret"))
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
                     .body(BodyInserters.fromFormData("grant_type", "authorization_code")
                             .with("code", code)
-                            .with("redirect_uri", "http://localhost:9091/api/auth/callback")
+                            .with("redirect_uri", Constants.getAuthGatewayCallbackUrl())
                             .with("client_id", "bff-client"))
                     .retrieve()
                     .bodyToMono(new ParameterizedTypeReference<Map<String, String>>() {})
@@ -79,7 +79,7 @@ public class AuthController {
 
             if (tokenResponse == null || !tokenResponse.containsKey("access_token")) {
                 log.error("❌ 토큰 교환 실패");
-                response.sendRedirect("http://localhost:3000?login=failed&error=token_exchange_failed");
+                response.sendRedirect(buildFrontendRedirectUrl(LoginResult.FAILED, ErrorCode.TOKEN_EXCHANGE_FAILED));
                 return;
             }
 
@@ -102,12 +102,12 @@ public class AuthController {
             response.addCookie(sessionCookie);
 
             // 6️⃣ SPA로 성공 리다이렉트
-            response.sendRedirect("http://localhost:3000?login=success");
+            response.sendRedirect(buildFrontendRedirectUrl(LoginResult.SUCCESS, null));
 
         } catch (Exception e) {
             log.error("❌ 로그인 콜백 처리 실패: {}", e.getMessage(), e);
             try {
-                response.sendRedirect("http://localhost:3000?login=error");
+                response.sendRedirect(buildFrontendRedirectUrl(LoginResult.FAILED, ErrorCode.CALL_BACK_FAILED));
             } catch (IOException ioException) {
                 log.error("❌ 리다이렉트 실패: {}", ioException.getMessage());
             }
@@ -127,16 +127,16 @@ public class AuthController {
                 String accessToken = tokenService.getAccessToken(sessionId);
                 if (accessToken != null) {
                     // 이미 로그인된 상태 - SPA로 리다이렉트
-                    response.sendRedirect("http://localhost:3000?login=already");
+                    response.sendRedirect(buildFrontendRedirectUrl(LoginResult.ALREADY, null));
                     return;
                 }
             }
 
             // 2️⃣ 세션이 없으면 OAuth2 Authorization Server로 리다이렉트
-            String authorizeUrl = UriComponentsBuilder.fromUriString("http://localhost:9090/oauth2/authorize")
+            String authorizeUrl = UriComponentsBuilder.fromUriString(Constants.getAuthServerAuthorizeUrl())
                     .queryParam("response_type", "code")
                     .queryParam("client_id", "bff-client")
-                    .queryParam("redirect_uri", "http://localhost:9091/api/auth/callback")
+                    .queryParam("redirect_uri", Constants.getAuthGatewayCallbackUrl())
                     .queryParam("scope", "openid profile email")
                     .queryParam("state", UUID.randomUUID().toString()) // CSRF 방지
                     .build().toUriString();
@@ -249,14 +249,8 @@ public class AuthController {
             // 2️⃣ Auth Server 세션 무효화
             try {
                 webClient.get()
-                        .uri(uriBuilder -> uriBuilder
-                                .scheme("http")
-                                .host("localhost")
-                                .port(9090)
-                                .path("/logout")
-                                .queryParam("post_logout_redirect_uri", "http://localhost:3000?logout=success")
-                                .build())
-                        .cookie("JSESSIONID", getAuthServerSessionIdFromCookie(request))
+                        .uri(Constants.getAuthServerLogoutUrl())
+                        .cookie("JSESSIONID", Objects.requireNonNull(getAuthServerSessionIdFromCookie(request)))
                         .retrieve()
                         .toBodilessEntity()
                         .block();
@@ -302,4 +296,13 @@ public class AuthController {
         }
         return null;
     }
+
+    private String buildFrontendRedirectUrl(String status, String error) {
+        String url = Constants.getFrontendUrl() + "?login=" + status;
+        if (error != null) {
+            url += "&error=" + error;
+        }
+        return url;
+    }
+
 }

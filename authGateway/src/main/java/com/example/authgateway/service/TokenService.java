@@ -1,6 +1,7 @@
 package com.example.authgateway.service;
 
 import com.example.authgateway.dto.TokenResponse;
+import com.example.Constants.Constants;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
@@ -10,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -19,7 +19,6 @@ import org.springframework.web.client.RestTemplate;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -36,7 +35,7 @@ public class TokenService {
      */
     public TokenResponse exchangeToken(String authorizationCode, String state) {
         try {
-            String tokenUrl = "http://localhost:9090/oauth2/token";
+            String tokenUrl = Constants.getAuthServerTokenUrl();
             
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
@@ -45,7 +44,7 @@ public class TokenService {
             MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
             body.add("grant_type", "authorization_code");
             body.add("code", authorizationCode);
-            body.add("redirect_uri", "http://localhost:9091/api/auth/callback");
+            body.add("redirect_uri", Constants.getAuthGatewayCallbackUrl());
             body.add("client_id", "bff-client");
 
             HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
@@ -118,7 +117,7 @@ public class TokenService {
      */
     public TokenResponse refreshToken(String refreshToken) {
         try {
-            String tokenUrl = "http://localhost:9090/oauth2/token";
+            String tokenUrl = Constants.getAuthServerTokenUrl();
             
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
@@ -173,7 +172,7 @@ public class TokenService {
             
             // 3️⃣ 발급자 검증 (Auth Server에서 발급된 토큰인지 확인)
             String issuer = claimsSet.getIssuer();
-            if (issuer == null || !issuer.equals("http://localhost:9090")) {
+            if (issuer == null || !issuer.equals(Constants.getAuthServerUrl())) {
                 log.error("❌ 잘못된 토큰 발급자: {}", issuer);
                 return null;
             }
