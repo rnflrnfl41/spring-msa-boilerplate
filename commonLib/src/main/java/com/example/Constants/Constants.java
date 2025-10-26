@@ -1,4 +1,4 @@
-package com.example.util;
+package com.example.Constants;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -49,10 +49,31 @@ public class Constants {
     
     @Value("${app.service-names.eureka}")
     public static String EUREKA_SERVER_NAME;
+
     
     // ===== URL 조합 메서드들 =====
     public static String getAuthServerUrl() {
         return BASE_URL + ":" + AUTH_SERVER_PORT;
+    }
+
+    public static String getAuthServerTokenUrl() {
+        return  getAuthServerUrl() + "/oauth2/token";
+    }
+
+    public static String getAuthServerLogoutUrl() {
+        return  getAuthServerUrl() + "/logout";
+    }
+
+    public static String getAuthServerAuthorizeUrl() {
+        return  getAuthServerUrl() + "/oauth2/authorize";
+    }
+
+    public static String getAuthGatewayCallbackUrl() {
+        return  getAuthGatewayUrl() + "/api/auth/callback";
+    }
+
+    public static String getFrontendDashBoardUrl() {
+        return  getAuthGatewayUrl() + "/dashboard";
     }
     
     public static String getAuthGatewayUrl() {
