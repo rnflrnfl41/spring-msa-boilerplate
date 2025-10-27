@@ -1,8 +1,6 @@
 spring:
-  config:
-    import: "classpath:application-common.yml"
   application:
-    name: ${app.service-names.auth-server}
+    name: auth-server
 
   security:
     oauth2:
@@ -84,3 +82,12 @@ logging:
     com.example.authserver: DEBUG
     org.springframework.web: DEBUG
     org.springframework.web.client: DEBUG
+
+
+app:
+  base-url: http://localhost
+
+  ports:
+    auth-server: 9090
+    frontend: 3000
+    auth-gateway: 9091

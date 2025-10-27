@@ -1,6 +1,5 @@
 package com.example.authserver.config;
 
-import com.example.Constants.Constants;
 import com.example.authserver.service.CustomOidcUserService;
 import com.example.authserver.service.CustomOAuth2UserService;
 import com.example.util.Jwk;
@@ -9,6 +8,7 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -49,10 +49,12 @@ import java.util.*;
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
+@EnableConfigurationProperties(AppProperties.class)
 public class SecurityConfig {
 
     private final OAuth2LoginSuccessHandler oauth2LoginSuccessHandler;
     private final FormLoginSuccessHandler formLoginSuccessHandler;
+    private final AppProperties appProperties;
 
     // ========================================
     // OAuth2 Authorization Server 필터 체인
@@ -141,8 +143,8 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(Arrays.asList(
-                Constants.getFrontendUrl(),  // SPA
-                Constants.getAuthGatewayUrl()  // BFF 서버
+                appProperties.getFrontendUrl(),  // SPA
+                appProperties.getAuthGatewayUrl()  // BFF 서버
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
@@ -164,7 +166,7 @@ public class SecurityConfig {
                 .clientSecret(passwordEncoder.encode("bff-secret"))
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-                .redirectUri(Constants.getAuthGatewayCallbackUrl()) // BFF가 code 받는 URI
+                .redirectUri(appProperties.getAuthGatewayCallbackUrl()) // BFF가 code 받는 URI
                 .scope("openid")
                 .scope("profile")
                 .scope("email")
@@ -257,7 +259,7 @@ public class SecurityConfig {
     @Bean
     public AuthorizationServerSettings authorizationServerSettings() {
         return AuthorizationServerSettings.builder()
-                .issuer(Constants.getAuthServerUrl()) // OAuth2 표준: 고정 URL
+                .issuer(appProperties.getAuthServerUrl()) // OAuth2 표준: 고정 URL
                 .build();
     }
 
