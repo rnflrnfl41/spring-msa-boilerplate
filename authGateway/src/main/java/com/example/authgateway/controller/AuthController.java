@@ -2,9 +2,9 @@ package com.example.authgateway.controller;
 
 import com.example.Constants.ErrorCode;
 import com.example.Constants.LoginResult;
+import com.example.authgateway.config.AppProperties;
 import com.example.authgateway.dto.TokenResponse;
 import com.example.authgateway.service.TokenService;
-import com.example.Constants.Constants;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -35,6 +35,7 @@ public class AuthController {
 
     private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder;
+    private final AppProperties appProperties;
 
     private final WebClient webClient = WebClient.create();
 
@@ -66,12 +67,12 @@ public class AuthController {
 
             // 3️⃣ Authorization Code로 토큰 교환 (Spring Security OAuth2 Authorization Server 사용)
             Map<String, String> tokenResponse = webClient.post()
-                    .uri(Constants.getAuthServerTokenUrl())
+                    .uri(appProperties.getAuthServerTokenUrl())
                     .headers(headers -> headers.setBasicAuth("bff-client", "bff-secret"))
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
                     .body(BodyInserters.fromFormData("grant_type", "authorization_code")
                             .with("code", code)
-                            .with("redirect_uri", Constants.getAuthGatewayCallbackUrl())
+                            .with("redirect_uri", appProperties.getAuthGatewayCallbackUrl())
                             .with("client_id", "bff-client"))
                     .retrieve()
                     .bodyToMono(new ParameterizedTypeReference<Map<String, String>>() {})
@@ -133,10 +134,10 @@ public class AuthController {
             }
 
             // 2️⃣ 세션이 없으면 OAuth2 Authorization Server로 리다이렉트
-            String authorizeUrl = UriComponentsBuilder.fromUriString(Constants.getAuthServerAuthorizeUrl())
+            String authorizeUrl = UriComponentsBuilder.fromUriString(appProperties.getAuthServerAuthorizeUrl())
                     .queryParam("response_type", "code")
                     .queryParam("client_id", "bff-client")
-                    .queryParam("redirect_uri", Constants.getAuthGatewayCallbackUrl())
+                    .queryParam("redirect_uri", appProperties.getAuthGatewayCallbackUrl())
                     .queryParam("scope", "openid profile email")
                     .queryParam("state", UUID.randomUUID().toString()) // CSRF 방지
                     .build().toUriString();
@@ -249,7 +250,7 @@ public class AuthController {
             // 2️⃣ Auth Server 세션 무효화
             try {
                 webClient.get()
-                        .uri(Constants.getAuthServerLogoutUrl())
+                        .uri(appProperties.getAuthServerLogoutUrl())
                         .cookie("JSESSIONID", Objects.requireNonNull(getAuthServerSessionIdFromCookie(request)))
                         .retrieve()
                         .toBodilessEntity()
@@ -298,7 +299,7 @@ public class AuthController {
     }
 
     private String buildFrontendRedirectUrl(String status, String error) {
-        String url = Constants.getFrontendUrl() + "?login=" + status;
+        String url = appProperties.getFrontendUrl() + "?login=" + status;
         if (error != null) {
             url += "&error=" + error;
         }

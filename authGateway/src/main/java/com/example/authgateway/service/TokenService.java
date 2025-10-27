@@ -1,7 +1,7 @@
 package com.example.authgateway.service;
 
+import com.example.authgateway.config.AppProperties;
 import com.example.authgateway.dto.TokenResponse;
-import com.example.Constants.Constants;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
@@ -29,13 +29,14 @@ public class TokenService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final PasswordEncoder passwordEncoder;
+    private final AppProperties appProperties;
 
     /**
      * OAuth2 Authorization Server에서 토큰 교환
      */
     public TokenResponse exchangeToken(String authorizationCode, String state) {
         try {
-            String tokenUrl = Constants.getAuthServerTokenUrl();
+            String tokenUrl = appProperties.getAuthServerTokenUrl();
             
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
@@ -44,7 +45,7 @@ public class TokenService {
             MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
             body.add("grant_type", "authorization_code");
             body.add("code", authorizationCode);
-            body.add("redirect_uri", Constants.getAuthGatewayCallbackUrl());
+            body.add("redirect_uri", appProperties.getAuthGatewayCallbackUrl());
             body.add("client_id", "bff-client");
 
             HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
@@ -117,7 +118,7 @@ public class TokenService {
      */
     public TokenResponse refreshToken(String refreshToken) {
         try {
-            String tokenUrl = Constants.getAuthServerTokenUrl();
+            String tokenUrl = appProperties.getAuthServerTokenUrl();
             
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
@@ -172,7 +173,7 @@ public class TokenService {
             
             // 3️⃣ 발급자 검증 (Auth Server에서 발급된 토큰인지 확인)
             String issuer = claimsSet.getIssuer();
-            if (issuer == null || !issuer.equals(Constants.getAuthServerUrl())) {
+            if (issuer == null || !issuer.equals(appProperties.getAuthServerUrl())) {
                 log.error("❌ 잘못된 토큰 발급자: {}", issuer);
                 return null;
             }

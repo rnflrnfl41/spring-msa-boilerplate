@@ -1,11 +1,9 @@
 spring:
-  config:
-    import: "classpath:application-common.yml"
   application:
-    name: ${app.service-names.eureka}
+    name: eurekaServer
 
 server:
-  port: ${app.ports.eureka}
+  port: 8761
 
 eureka:
   client:
