@@ -1,10 +1,7 @@
 spring:
 
-  config:
-    import: "classpath:application-common.yml"
-
   application:
-    name: ${app.service-names.auth-gateway}
+    name: authGateway
   
   # CORS 설정
   web:
@@ -54,3 +51,12 @@ logging:
   level:
     com.example.authgateway: DEBUG
     org.springframework.security: DEBUG
+
+
+app:
+  base-url: http://localhost
+
+  ports:
+    auth-server: 9090
+    frontend: 3000
+    auth-gateway: 9091
