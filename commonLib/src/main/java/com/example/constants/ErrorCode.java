@@ -1,4 +1,4 @@
-package com.example.Constants;
+package com.example.constants;
 
 public class ErrorCode {
     public static final String NO_AUTHORIZATION_CODE = "no_authorization_code";

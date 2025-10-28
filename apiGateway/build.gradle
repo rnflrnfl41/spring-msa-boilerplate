@@ -3,6 +3,7 @@
 dependencies {
     // Common Library
     implementation project(':commonLib')
+    implementation project(':infra')
     
     // Spring Cloud Gateway
     implementation 'org.springframework.cloud:spring-cloud-starter-gateway'

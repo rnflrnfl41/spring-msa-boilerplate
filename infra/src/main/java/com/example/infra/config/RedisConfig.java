@@ -1,4 +1,4 @@
-package com.example.authgateway.config;
+package com.example.infra.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -14,26 +14,26 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 @RequiredArgsConstructor
 public class RedisConfig {
 
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper; // 주입받아 사용
 
     @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
-        
-        // String 직렬화 설정
+
+        // Key 직렬화
         template.setKeySerializer(new StringRedisSerializer());
         template.setHashKeySerializer(new StringRedisSerializer());
-        
-        // JSON 직렬화 설정 (WebConfig의 ObjectMapper 사용)
-        ObjectMapper redisObjectMapper = objectMapper.copy();
-        redisObjectMapper.registerModule(new JavaTimeModule());
-        GenericJackson2JsonRedisSerializer jsonSerializer = new GenericJackson2JsonRedisSerializer(redisObjectMapper);
-        
+
+        // Value 직렬화 (ObjectMapper 복사)
+        ObjectMapper redisMapper = objectMapper.copy();
+        redisMapper.registerModule(new JavaTimeModule());
+        GenericJackson2JsonRedisSerializer jsonSerializer = new GenericJackson2JsonRedisSerializer(redisMapper);
+
         template.setValueSerializer(jsonSerializer);
         template.setHashValueSerializer(jsonSerializer);
-        
         template.afterPropertiesSet();
+
         return template;
     }
 }

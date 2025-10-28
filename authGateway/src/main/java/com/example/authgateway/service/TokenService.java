@@ -8,13 +8,14 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -26,38 +27,54 @@ import java.util.Map;
 public class TokenService {
 
     private final RedisTemplate<String, Object> redisTemplate;
-    private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper;
     private final PasswordEncoder passwordEncoder;
     private final AppProperties appProperties;
+
+    private final WebClient webClient;
 
     /**
      * OAuth2 Authorization Server에서 토큰 교환
      */
-    public TokenResponse exchangeToken(String authorizationCode, String state) {
+    public TokenResponse exchangeToken(String authorizationCode) {
         try {
-            String tokenUrl = appProperties.getAuthServerTokenUrl();
-            
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-            headers.setBasicAuth("bff-client", "bff-secret");
+            return webClient.post()
+                    .uri(appProperties.getAuthServerTokenUrl())
+                    .headers(h -> h.setBasicAuth("bff-client", "bff-secret"))
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(BodyInserters.fromFormData("grant_type", "authorization_code")
+                            .with("code", authorizationCode)
+                            .with("redirect_uri", appProperties.getAuthGatewayCallbackUrl())
+                            .with("client_id", "bff-client"))
+                    .retrieve()
+                    .onStatus(HttpStatusCode::is4xxClientError, res -> {
+                        log.error("❌ 4xx 클라이언트 오류 발생: {}", res.statusCode());
+                        return res.bodyToMono(String.class)
+                                .doOnNext(body -> log.error("📩 4xx 응답 내용: {}", body))
+                                .map(RuntimeException::new);
+                    })
+                    .onStatus(HttpStatusCode::is5xxServerError, res -> {
+                        log.error("❌ 5xx 서버 오류 발생: {}", res.statusCode());
+                        return res.bodyToMono(String.class)
+                                .doOnNext(body -> log.error("📩 5xx 응답 내용: {}", body))
+                                .map(RuntimeException::new);
+                    })
+                    .bodyToMono(TokenResponse.class)
+                    .doOnNext(t -> {
+                        String token = t.getAccessToken();
+                        if (token != null && !token.isEmpty()) {
+                            log.info("✅ 토큰 교환 성공: {}", token.length() > 20
+                                    ? token.substring(0, 20) + "..."
+                                    : token);
+                        } else {
+                            log.warn("⚠️ access_token 값이 비어 있습니다: {}", t);
+                        }
+                    })
+                    .block();
 
-            MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-            body.add("grant_type", "authorization_code");
-            body.add("code", authorizationCode);
-            body.add("redirect_uri", appProperties.getAuthGatewayCallbackUrl());
-            body.add("client_id", "bff-client");
-
-            HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
-            
-            ResponseEntity<TokenResponse> response = restTemplate.postForEntity(tokenUrl, request, TokenResponse.class);
-            
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                log.info("✅ 토큰 교환 성공: {}", response.getBody().getAccessToken().substring(0, 20) + "...");
-                return response.getBody();
-            }
+        } catch (WebClientResponseException e) {
+            log.error("❌ WebClient 오류: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
         } catch (Exception e) {
-            log.error("❌ 토큰 교환 실패: {}", e.getMessage());
+            log.error("❌ 토큰 교환 중 예외 발생: {}", e.getMessage());
         }
         return null;
     }
@@ -70,8 +87,8 @@ public class TokenService {
             // Access Token을 30분간 저장
             redisTemplate.opsForValue().set(
                 "access_token:" + sessionId, 
-                tokenResponse.getAccessToken(), 
-                Duration.ofMinutes(30)
+                tokenResponse.getAccessToken(),
+                Duration.ofSeconds(tokenResponse.getExpiresIn() != null ? tokenResponse.getExpiresIn() : 1800)
             );
             
             // Refresh Token을 7일간 저장
@@ -116,10 +133,10 @@ public class TokenService {
     /**
      * 토큰 갱신
      */
-    public TokenResponse refreshToken(String refreshToken) {
+    /*public TokenResponse refreshToken(String refreshToken) {
         try {
             String tokenUrl = appProperties.getAuthServerTokenUrl();
-            
+
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
             headers.setBasicAuth("bff-client", "bff-secret");
@@ -130,9 +147,9 @@ public class TokenService {
             body.add("client_id", "bff-client");
 
             HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
-            
+
             ResponseEntity<TokenResponse> response = restTemplate.postForEntity(tokenUrl, request, TokenResponse.class);
-            
+
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
                 log.info("✅ 토큰 갱신 성공");
                 return response.getBody();
@@ -141,7 +158,7 @@ public class TokenService {
             log.error("❌ 토큰 갱신 실패: {}", e.getMessage());
         }
         return null;
-    }
+    }*/
 
     /**
      * 세션 삭제

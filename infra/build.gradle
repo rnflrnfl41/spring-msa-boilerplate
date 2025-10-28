@@ -1,0 +1,32 @@
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    // spring core deps
+    api 'org.springframework:spring-context'
+    api 'org.springframework.boot:spring-boot-starter-data-redis'
+    api 'org.springframework.boot:spring-boot-starter-webflux'
+    api 'com.fasterxml.jackson.core:jackson-databind'
+
+    implementation 'org.modelmapper:modelmapper:3.2.0'
+    implementation 'org.springframework.security:spring-security-crypto'
+
+    // lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+}
+
+// Spring Boot 테스트 의존성 제외 (라이브러리 모듈이므로)
+configurations {
+    testImplementation {
+        exclude group: 'org.springframework.boot', module: 'spring-boot-starter-test'
+    }
+}
+
+// JAR 파일 생성 활성화
+jar {
+    enabled = true
+    archiveClassifier = '' // 기본 JAR 파일 생성
+}

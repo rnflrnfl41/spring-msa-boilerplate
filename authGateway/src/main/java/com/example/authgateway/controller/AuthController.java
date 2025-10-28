@@ -1,7 +1,7 @@
 package com.example.authgateway.controller;
 
-import com.example.Constants.ErrorCode;
-import com.example.Constants.LoginResult;
+import com.example.constants.ErrorCode;
+import com.example.constants.LoginResult;
 import com.example.authgateway.config.AppProperties;
 import com.example.authgateway.dto.TokenResponse;
 import com.example.authgateway.service.TokenService;
@@ -36,8 +36,7 @@ public class AuthController {
     private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder;
     private final AppProperties appProperties;
-
-    private final WebClient webClient = WebClient.create();
+    private final WebClient webClient;
 
     /**
      * Auth Server → BFF callback (Authorization Code 받음)
@@ -66,19 +65,9 @@ public class AuthController {
             }
 
             // 3️⃣ Authorization Code로 토큰 교환 (Spring Security OAuth2 Authorization Server 사용)
-            Map<String, String> tokenResponse = webClient.post()
-                    .uri(appProperties.getAuthServerTokenUrl())
-                    .headers(headers -> headers.setBasicAuth("bff-client", "bff-secret"))
-                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-                    .body(BodyInserters.fromFormData("grant_type", "authorization_code")
-                            .with("code", code)
-                            .with("redirect_uri", appProperties.getAuthGatewayCallbackUrl())
-                            .with("client_id", "bff-client"))
-                    .retrieve()
-                    .bodyToMono(new ParameterizedTypeReference<Map<String, String>>() {})
-                    .block();
+            TokenResponse tokenResponse = tokenService.exchangeToken(code);
 
-            if (tokenResponse == null || !tokenResponse.containsKey("access_token")) {
+            if (tokenResponse == null) {
                 log.error("❌ 토큰 교환 실패");
                 response.sendRedirect(buildFrontendRedirectUrl(LoginResult.FAILED, ErrorCode.TOKEN_EXCHANGE_FAILED));
                 return;
@@ -86,14 +75,7 @@ public class AuthController {
 
             // 4️⃣ 토큰을 세션으로 저장
             String sessionId = UUID.randomUUID().toString();
-            TokenResponse tokenObj = new TokenResponse();
-            tokenObj.setAccessToken(tokenResponse.get("access_token"));
-            tokenObj.setRefreshToken(tokenResponse.get("refresh_token"));
-            tokenObj.setTokenType(tokenResponse.get("token_type"));
-            tokenObj.setExpiresIn(Long.valueOf(tokenResponse.get("expires_in")));
-            tokenObj.setScope(tokenResponse.get("scope"));
-
-            tokenService.saveToken(sessionId, tokenObj);
+            tokenService.saveToken(sessionId, tokenResponse);
 
             // 5️⃣ SPA에 sessionId 쿠키 전달
             Cookie sessionCookie = new Cookie("SESSION_ID", sessionId);
