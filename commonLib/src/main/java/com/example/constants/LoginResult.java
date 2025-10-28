@@ -1,4 +1,4 @@
-package com.example.Constants;
+package com.example.constants;
 
 public class LoginResult {
     public static final String SUCCESS = "success";

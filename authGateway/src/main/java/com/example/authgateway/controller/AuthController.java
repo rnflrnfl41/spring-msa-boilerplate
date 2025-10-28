@@ -1,7 +1,7 @@
 package com.example.authgateway.controller;
 
-import com.example.Constants.ErrorCode;
-import com.example.Constants.LoginResult;
+import com.example.constants.ErrorCode;
+import com.example.constants.LoginResult;
 import com.example.authgateway.config.AppProperties;
 import com.example.authgateway.dto.TokenResponse;
 import com.example.authgateway.service.TokenService;
