@@ -36,8 +36,7 @@ public class AuthController {
     private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder;
     private final AppProperties appProperties;
-
-    private final WebClient webClient = WebClient.create();
+    private final WebClient webClient;
 
     /**
      * Auth Server → BFF callback (Authorization Code 받음)

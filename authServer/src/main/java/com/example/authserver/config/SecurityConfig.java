@@ -200,11 +200,6 @@ public class SecurityConfig {
     }
 
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    @Bean
     public CustomOidcUserService customOidcUserService() {
         return new CustomOidcUserService();
     }
