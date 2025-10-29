@@ -1,4 +1,4 @@
-package com.example.authgateway.config;
+package com.example.webbffserver.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

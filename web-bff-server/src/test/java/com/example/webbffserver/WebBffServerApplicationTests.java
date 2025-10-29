@@ -1,10 +1,10 @@
-package com.example.authgateway;
+package com.example.webbffserver;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class AuthGatewayApplicationTests {
+class WebBffServerApplicationTests {
 
     @Test
     void contextLoads() {

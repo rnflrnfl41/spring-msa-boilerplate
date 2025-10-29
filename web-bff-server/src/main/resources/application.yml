@@ -1,9 +1,9 @@
 spring:
 
   application:
-    name: authGateway
-  
-  # CORS 설정
+    name: web-bff-server
+
+  # CORS ??
   web:
     cors:
       allowed-origins: "${app.base-url}:${app.ports.frontend}"
@@ -11,13 +11,13 @@ spring:
       allowed-headers: "*"
       allow-credentials: true
       max-age: 3600
-  
-  # Redis 설정
+
+  # Redis ??
   data:
     redis:
       host: localhost
       port: 6379
-      password: 
+      password:
       timeout: 2000ms
       lettuce:
         pool:
@@ -25,7 +25,7 @@ spring:
           max-idle: 8
           min-idle: 0
 
-  # OAuth2 Client 설정 (BFF가 Auth Server의 클라이언트)
+  # OAuth2 Client ?? (BFF? Auth Server? ?????)
   security:
     oauth2:
       client:
@@ -46,7 +46,7 @@ spring:
 server:
   port: ${app.ports.auth-gateway}
 
-# 로깅 설정
+# ?? ??
 logging:
   level:
     com.example.authgateway: DEBUG

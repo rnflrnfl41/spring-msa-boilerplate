@@ -1,4 +1,4 @@
-package com.example.authgateway.dto;
+package com.example.webbffserver.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;

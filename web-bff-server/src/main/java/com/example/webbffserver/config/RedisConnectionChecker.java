@@ -1,4 +1,4 @@
-package com.example.authgateway.config;
+package com.example.webbffserver.config;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;

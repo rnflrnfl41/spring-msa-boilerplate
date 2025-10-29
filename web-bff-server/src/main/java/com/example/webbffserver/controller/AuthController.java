@@ -1,23 +1,20 @@
-package com.example.authgateway.controller;
+package com.example.webbffserver.controller;
+
 
 import com.example.constants.ErrorCode;
 import com.example.constants.LoginResult;
-import com.example.authgateway.config.AppProperties;
-import com.example.authgateway.dto.TokenResponse;
-import com.example.authgateway.service.TokenService;
+import com.example.webbffserver.config.AppProperties;
+import com.example.webbffserver.dto.TokenResponse;
+import com.example.webbffserver.service.TokenService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 

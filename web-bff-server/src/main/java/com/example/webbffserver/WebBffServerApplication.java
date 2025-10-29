@@ -1,4 +1,4 @@
-package com.example.authgateway;
+package com.example.webbffserver;
 
 import com.example.infra.annotation.EnablePasswordEncoderConfig;
 import com.example.infra.annotation.EnableRedisConfig;
@@ -10,10 +10,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @EnableWebConfig
 @EnablePasswordEncoderConfig
 @EnableRedisConfig
-public class AuthGatewayApplication {
+public class WebBffServerApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(AuthGatewayApplication.class, args);
+        SpringApplication.run(WebBffServerApplication.class, args);
     }
 
 }

@@ -1,16 +1,15 @@
-package com.example.authgateway.service;
+package com.example.webbffserver.service;
 
-import com.example.authgateway.config.AppProperties;
-import com.example.authgateway.dto.TokenResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.webbffserver.config.AppProperties;
+import com.example.webbffserver.dto.TokenResponse;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.*;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.BodyInserters;
