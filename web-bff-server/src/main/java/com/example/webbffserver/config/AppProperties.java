@@ -45,4 +45,6 @@ public class AppProperties {
         return  getAuthServerUrl() + "/logout";
     }
 
+    public String getAuthServerJwkSetUri() { return getAuthServerUrl() + "/.well-known/jwks.json"; }
+
 }

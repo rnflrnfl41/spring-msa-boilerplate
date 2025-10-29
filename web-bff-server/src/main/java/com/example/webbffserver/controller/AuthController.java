@@ -6,6 +6,7 @@ import com.example.constants.LoginResult;
 import com.example.webbffserver.config.AppProperties;
 import com.example.webbffserver.dto.TokenResponse;
 import com.example.webbffserver.service.TokenService;
+import com.example.webbffserver.utils.CookieUtil;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -71,17 +72,18 @@ public class AuthController {
             }
 
             // 4️⃣ 토큰을 세션으로 저장
-            String sessionId = UUID.randomUUID().toString();
-            tokenService.saveToken(sessionId, tokenResponse);
+            //String sessionId = UUID.randomUUID().toString();
+            //tokenService.saveToken(sessionId, tokenResponse);
 
-            // 5️⃣ SPA에 sessionId 쿠키 전달
-            Cookie sessionCookie = new Cookie("SESSION_ID", sessionId);
-            sessionCookie.setHttpOnly(true);
-            sessionCookie.setPath("/");
-            sessionCookie.setMaxAge(7 * 24 * 60 * 60); // 7일
-            response.addCookie(sessionCookie);
+            String accessToken = tokenResponse.getAccessToken();
+            String refreshToken = tokenResponse.getRefreshToken();
 
-            // 6️⃣ SPA로 성공 리다이렉트
+            // JWT를 HttpOnly 쿠키에 저장
+            CookieUtil.addTokenCookies(response, accessToken, refreshToken, /*secure*/ false);
+
+            log.info("✅ 토큰 쿠키 저장 완료 (Access={}, Refresh={})", accessToken != null, refreshToken != null);
+
+            // 5️⃣ SPA로 성공 리다이렉트
             response.sendRedirect(buildFrontendRedirectUrl(LoginResult.SUCCESS, null));
 
         } catch (Exception e) {
@@ -101,15 +103,12 @@ public class AuthController {
     @GetMapping("/login")
     public void login(HttpServletRequest request, HttpServletResponse response) {
         try {
-            // 1️⃣ 세션 검증
-            String sessionId = getSessionIdFromCookie(request);
-            if (sessionId != null) {
-                String accessToken = tokenService.getAccessToken(sessionId);
-                if (accessToken != null) {
-                    // 이미 로그인된 상태 - SPA로 리다이렉트
-                    response.sendRedirect(buildFrontendRedirectUrl(LoginResult.ALREADY, null));
-                    return;
-                }
+
+            String accessToken = CookieUtil.getCookie(request, "ACCESS_TOKEN");
+            if (accessToken != null) {
+                // 이미 로그인된 상태 - SPA로 리다이렉트
+                response.sendRedirect(buildFrontendRedirectUrl(LoginResult.ALREADY, null));
+                return;
             }
 
             // 2️⃣ 세션이 없으면 OAuth2 Authorization Server로 리다이렉트
@@ -136,14 +135,8 @@ public class AuthController {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            String sessionId = getSessionIdFromCookie(request);
-            if (sessionId == null) {
-                result.put("authenticated", false);
-                result.put("message", "세션 없음");
-                return ResponseEntity.ok(result);
-            }
 
-            String accessToken = tokenService.getAccessToken(sessionId);
+            String accessToken = CookieUtil.getCookie(request, "ACCESS_TOKEN");
             if (accessToken == null) {
                 result.put("authenticated", false);
                 result.put("message", "토큰 없음");
@@ -152,7 +145,6 @@ public class AuthController {
 
             result.put("authenticated", true);
             result.put("message", "인증됨");
-            result.put("sessionId", sessionId);
             return ResponseEntity.ok(result);
 
         } catch (Exception e) {
@@ -171,14 +163,9 @@ public class AuthController {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            String sessionId = getSessionIdFromCookie(request);
-            if (sessionId == null) {
-                result.put("success", false);
-                result.put("error", "세션 없음");
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(result);
-            }
 
-            String accessToken = tokenService.getAccessToken(sessionId);
+            String accessToken = CookieUtil.getCookie(request, "ACCESS_TOKEN");
+
             if (accessToken == null) {
                 result.put("success", false);
                 result.put("error", "토큰 없음");
