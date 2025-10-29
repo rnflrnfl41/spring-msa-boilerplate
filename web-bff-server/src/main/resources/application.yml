@@ -1,0 +1,62 @@
+spring:
+
+  application:
+    name: web-bff-server
+
+  # CORS ??
+  web:
+    cors:
+      allowed-origins: "${app.base-url}:${app.ports.frontend}"
+      allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
+      allowed-headers: "*"
+      allow-credentials: true
+      max-age: 3600
+
+  # Redis ??
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+  # OAuth2 Client ?? (BFF? Auth Server? ?????)
+  security:
+    oauth2:
+      client:
+        registration:
+          auth-server:
+            client-id: bff-client
+            client-secret: "bff-secret"
+            authorization-grant-type: authorization_code
+            redirect-uri: "${app.base-url}:${app.ports.auth-gateway}/api/auth/callback"
+            scope: openid,profile,email
+        provider:
+          auth-server:
+            authorization-uri: "${app.base-url}:${app.ports.auth-server}/oauth2/authorize"
+            token-uri: "${app.base-url}:${app.ports.auth-server}/oauth2/token"
+            user-info-uri: "${app.base-url}:${app.ports.auth-server}/userinfo"
+            jwk-set-uri: "${app.base-url}:${app.ports.auth-server}/.well-known/jwks.json"
+
+server:
+  port: ${app.ports.auth-gateway}
+
+# ?? ??
+logging:
+  level:
+    com.example.authgateway: DEBUG
+    org.springframework.security: DEBUG
+
+
+app:
+  base-url: http://localhost
+
+  ports:
+    auth-server: 9090
+    frontend: 3000
+    auth-gateway: 9091
