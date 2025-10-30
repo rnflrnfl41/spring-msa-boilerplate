@@ -1,4 +1,4 @@
-package com.example.webbffserver.config.request;
+package com.example.webbffserver.security.request;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
