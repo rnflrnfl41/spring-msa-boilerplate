@@ -1,5 +1,6 @@
 package com.example.webbffserver.config;
 
+import com.example.webbffserver.config.filter.JwtFromCookieFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -7,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -21,6 +23,7 @@ import java.util.Arrays;
 public class SecurityConfig {
 
     private final AppProperties appProperties;
+    private final JwtFromCookieFilter jwtFromCookieFilter;
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -45,6 +48,15 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/login", "/api/auth/callback", "/api/auth/status",
                                 "/api/auth/user/me", "/api/auth/logout", "/login/oauth2/code/**").permitAll()
                 )
+                // ✅ JWT 기반 인증 (Auth Server의 JWK URI 이용)
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt
+                                .jwkSetUri(appProperties.getAuthServerJwkSetUri())
+                        )
+                )
+
+                // ✅ 쿠키 → Authorization 헤더 변환 필터 추가
+                .addFilterBefore(jwtFromCookieFilter, BearerTokenAuthenticationFilter.class)
                 .build();
     }
 
