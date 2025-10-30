@@ -2,19 +2,25 @@ package com.example.webbffserver.service;
 
 import com.example.webbffserver.config.AppProperties;
 import com.example.webbffserver.dto.TokenResponse;
+import com.example.webbffserver.utils.CookieUtil;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.http.MediaType;
+import org.springframework.http.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -78,86 +84,47 @@ public class TokenService {
         return null;
     }
 
-    /**
-     * 세션 ID로 토큰 저장
-     */
-    public void saveToken(String sessionId, TokenResponse tokenResponse) {
+
+    public boolean refreshToken(HttpServletRequest req, HttpServletResponse res) {
+        String refreshToken = CookieUtil.getCookie(req, "REFRESH_TOKEN");
+        if (refreshToken == null) return false;
+
+        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+        formData.add("grant_type", "refresh_token");
+        formData.add("refresh_token", refreshToken);
+        formData.add("client_id", "bff-client");
+
         try {
-            // Access Token을 30분간 저장
-            redisTemplate.opsForValue().set(
-                "access_token:" + sessionId, 
-                tokenResponse.getAccessToken(),
-                Duration.ofSeconds(tokenResponse.getExpiresIn() != null ? tokenResponse.getExpiresIn() : 1800)
-            );
-            
-            // Refresh Token을 7일간 저장
-            if (tokenResponse.getRefreshToken() != null) {
-                redisTemplate.opsForValue().set(
-                    "refresh_token:" + sessionId, 
-                    tokenResponse.getRefreshToken(), 
-                    Duration.ofDays(7)
-                );
-            }
-            
-            log.info("✅ 토큰 저장 완료: sessionId={}", sessionId);
+            Map<String, Object> tokenResponse = webClient.post()
+                    .uri(appProperties.getAuthServerTokenUrl())
+                    .headers(headers -> {
+                        headers.setBasicAuth("bff-client", "bff-secret");
+                        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+                    })
+                    .body(BodyInserters.fromFormData(formData))
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, clientResponse -> {
+                        log.error("❌ Refresh 요청 실패: {}", clientResponse.statusCode());
+                        return Mono.error(new RuntimeException("Token refresh failed"));
+                    })
+                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                    .block();
+
+            if (tokenResponse == null || !tokenResponse.containsKey("access_token")) return false;
+
+            String newAccess = (String) tokenResponse.get("access_token");
+            String newRefresh = (String) tokenResponse.getOrDefault("refresh_token", refreshToken);
+
+            CookieUtil.addTokenCookies(res, newAccess, newRefresh, false);
+            log.info("✅ Refresh 성공, 새 AccessToken 발급 완료");
+            return true;
+
         } catch (Exception e) {
-            log.error("❌ 토큰 저장 실패: {}", e.getMessage());
+            log.error("❌ Refresh 중 예외 발생: {}", e.getMessage());
+            return false;
         }
     }
 
-    /**
-     * 세션 ID로 Access Token 조회
-     */
-    public String getAccessToken(String sessionId) {
-        try {
-            return (String) redisTemplate.opsForValue().get("access_token:" + sessionId);
-        } catch (Exception e) {
-            log.error("❌ Access Token 조회 실패: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * 세션 ID로 Refresh Token 조회
-     */
-    public String getRefreshToken(String sessionId) {
-        try {
-            return (String) redisTemplate.opsForValue().get("refresh_token:" + sessionId);
-        } catch (Exception e) {
-            log.error("❌ Refresh Token 조회 실패: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * 토큰 갱신
-     */
-    /*public TokenResponse refreshToken(String refreshToken) {
-        try {
-            String tokenUrl = appProperties.getAuthServerTokenUrl();
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-            headers.setBasicAuth("bff-client", "bff-secret");
-
-            MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-            body.add("grant_type", "refresh_token");
-            body.add("refresh_token", refreshToken);
-            body.add("client_id", "bff-client");
-
-            HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
-
-            ResponseEntity<TokenResponse> response = restTemplate.postForEntity(tokenUrl, request, TokenResponse.class);
-
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                log.info("✅ 토큰 갱신 성공");
-                return response.getBody();
-            }
-        } catch (Exception e) {
-            log.error("❌ 토큰 갱신 실패: {}", e.getMessage());
-        }
-        return null;
-    }*/
 
     /**
      * 세션 삭제

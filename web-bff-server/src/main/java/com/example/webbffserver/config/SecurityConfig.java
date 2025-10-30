@@ -1,6 +1,7 @@
 package com.example.webbffserver.config;
 
-import com.example.webbffserver.config.filter.JwtFromCookieFilter;
+import com.example.webbffserver.security.filter.JwtFromCookieFilter;
+import com.example.webbffserver.security.point.JwtAuthEntryPoint;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +25,7 @@ public class SecurityConfig {
 
     private final AppProperties appProperties;
     private final JwtFromCookieFilter jwtFromCookieFilter;
+    private final JwtAuthEntryPoint jwtAuthEntryPoint;
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -53,6 +55,7 @@ public class SecurityConfig {
                         .jwt(jwt -> jwt
                                 .jwkSetUri(appProperties.getAuthServerJwkSetUri())
                         )
+                        .authenticationEntryPoint(jwtAuthEntryPoint)
                 )
 
                 // ✅ 쿠키 → Authorization 헤더 변환 필터 추가
