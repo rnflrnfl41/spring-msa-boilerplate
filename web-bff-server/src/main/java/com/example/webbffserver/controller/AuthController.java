@@ -25,6 +25,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
+import static com.example.webbffserver.utils.CookieUtil.ACCESS_TOKEN_COOKIE;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/auth")
@@ -104,7 +106,7 @@ public class AuthController {
     public void login(HttpServletRequest request, HttpServletResponse response) {
         try {
 
-            String accessToken = CookieUtil.getCookie(request, "ACCESS_TOKEN");
+            String accessToken = CookieUtil.getCookie(request, ACCESS_TOKEN_COOKIE);
             if (accessToken != null) {
                 // 이미 로그인된 상태 - SPA로 리다이렉트
                 response.sendRedirect(buildFrontendRedirectUrl(LoginResult.ALREADY, null));
@@ -136,7 +138,7 @@ public class AuthController {
 
         try {
 
-            String accessToken = CookieUtil.getCookie(request, "ACCESS_TOKEN");
+            String accessToken = CookieUtil.getCookie(request, ACCESS_TOKEN_COOKIE);
             if (accessToken == null) {
                 result.put("authenticated", false);
                 result.put("message", "토큰 없음");
@@ -164,7 +166,7 @@ public class AuthController {
 
         try {
 
-            String accessToken = CookieUtil.getCookie(request, "ACCESS_TOKEN");
+            String accessToken = CookieUtil.getCookie(request, ACCESS_TOKEN_COOKIE);
 
             if (accessToken == null) {
                 result.put("success", false);

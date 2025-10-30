@@ -79,45 +79,6 @@ public class TokenService {
     }
 
     /**
-     * 세션 ID로 토큰 저장
-     */
-    public void saveToken(String sessionId, TokenResponse tokenResponse) {
-        try {
-            // Access Token을 30분간 저장
-            redisTemplate.opsForValue().set(
-                "access_token:" + sessionId, 
-                tokenResponse.getAccessToken(),
-                Duration.ofSeconds(tokenResponse.getExpiresIn() != null ? tokenResponse.getExpiresIn() : 1800)
-            );
-            
-            // Refresh Token을 7일간 저장
-            if (tokenResponse.getRefreshToken() != null) {
-                redisTemplate.opsForValue().set(
-                    "refresh_token:" + sessionId, 
-                    tokenResponse.getRefreshToken(), 
-                    Duration.ofDays(7)
-                );
-            }
-            
-            log.info("✅ 토큰 저장 완료: sessionId={}", sessionId);
-        } catch (Exception e) {
-            log.error("❌ 토큰 저장 실패: {}", e.getMessage());
-        }
-    }
-
-    /**
-     * 세션 ID로 Access Token 조회
-     */
-    public String getAccessToken(String sessionId) {
-        try {
-            return (String) redisTemplate.opsForValue().get("access_token:" + sessionId);
-        } catch (Exception e) {
-            log.error("❌ Access Token 조회 실패: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    /**
      * 세션 ID로 Refresh Token 조회
      */
     public String getRefreshToken(String sessionId) {
