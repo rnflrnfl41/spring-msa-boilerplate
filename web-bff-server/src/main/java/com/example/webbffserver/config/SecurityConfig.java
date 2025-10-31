@@ -53,7 +53,7 @@ public class SecurityConfig {
                 // ✅ JWT 기반 인증 (Auth Server의 JWK URI 이용)
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt
-                                .jwkSetUri(appProperties.getAuthServerJwkSetUri())
+                                .jwkSetUri(appProperties.getAuthServerJwkSetUrl())
                         )
                         .authenticationEntryPoint(jwtAuthEntryPoint)
                 )
