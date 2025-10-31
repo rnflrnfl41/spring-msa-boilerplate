@@ -12,19 +12,6 @@ spring:
       allow-credentials: true
       max-age: 3600
 
-  # Redis ??
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      password:
-      timeout: 2000ms
-      lettuce:
-        pool:
-          max-active: 8
-          max-idle: 8
-          min-idle: 0
-
   # OAuth2 Client ?? (BFF? Auth Server? ?????)
   security:
     oauth2:

@@ -11,9 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.*;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -31,8 +29,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class TokenService {
 
-    private final RedisTemplate<String, Object> redisTemplate;
-    private final PasswordEncoder passwordEncoder;
     private final AppProperties appProperties;
 
     private final WebClient webClient;
@@ -122,20 +118,6 @@ public class TokenService {
         } catch (Exception e) {
             log.error("❌ Refresh 중 예외 발생: {}", e.getMessage());
             return false;
-        }
-    }
-
-
-    /**
-     * 세션 삭제
-     */
-    public void deleteSession(String sessionId) {
-        try {
-            redisTemplate.delete("access_token:" + sessionId);
-            redisTemplate.delete("refresh_token:" + sessionId);
-            log.info("✅ 세션 삭제 완료: sessionId={}", sessionId);
-        } catch (Exception e) {
-            log.error("❌ 세션 삭제 실패: {}", e.getMessage());
         }
     }
 

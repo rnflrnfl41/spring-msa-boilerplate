@@ -13,9 +13,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -203,31 +205,30 @@ public class AuthController {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            // 1️⃣ BFF 세션/쿠키 삭제
-            String sessionId = getSessionIdFromCookie(request);
-            if (sessionId != null) {
-                tokenService.deleteSession(sessionId);
+            // 1️⃣ 토큰 쿠키 추출
+            String refreshToken = CookieUtil.getCookie(request, "REFRESH_TOKEN");
 
-                Cookie cookie = new Cookie("SESSION_ID", null);
-                cookie.setHttpOnly(true);
-                cookie.setPath("/");
-                cookie.setMaxAge(0);
-                response.addCookie(cookie);
-            }
+            // 2️⃣ 쿠키 제거
+            CookieUtil.clearTokenCookies(response, /*secure*/ false);
 
-            // 2️⃣ Auth Server 세션 무효화
-            try {
-                webClient.get()
-                        .uri(appProperties.getAuthServerLogoutUrl())
-                        .cookie("JSESSIONID", Objects.requireNonNull(getAuthServerSessionIdFromCookie(request)))
+            // 3️⃣ Auth Server에 RefreshToken 폐기 요청 (RFC7009 /oauth2/revoke)
+            if (refreshToken != null) {
+                webClient.post()
+                        .uri(appProperties.getAuthServerRevokeUrl())
+                        .headers(h -> {
+                            h.setBasicAuth("bff-client", "bff-secret"); // 클라이언트 인증
+                            h.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+                        })
+                        .body(BodyInserters.fromFormData("token", refreshToken)
+                                .with("token_type_hint", "refresh_token"))
                         .retrieve()
                         .toBodilessEntity()
                         .block();
-            } catch (Exception e) {
-                log.warn("Auth Server 로그아웃 실패: {}", e.getMessage());
+
+                log.info("✅ Auth Server에 RefreshToken revoke 요청 완료");
             }
 
-            // 3️⃣ JSON 응답 반환
+            // 4️⃣ 응답 반환
             result.put("success", true);
             result.put("message", "로그아웃 완료");
             return ResponseEntity.ok(result);
@@ -238,7 +239,6 @@ public class AuthController {
             result.put("error", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
         }
-
     }
 
     /**
