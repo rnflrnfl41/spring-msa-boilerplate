@@ -2,6 +2,8 @@ package com.example.authserver.config;
 
 import com.example.authserver.service.CustomOidcUserService;
 import com.example.authserver.service.CustomOAuth2UserService;
+import com.example.authserver.service.RedisOAuth2AuthorizationConsentService;
+import com.example.authserver.service.RedisOAuth2AuthorizationService;
 import com.example.util.Jwk;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
@@ -12,6 +14,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -55,6 +58,8 @@ public class SecurityConfig {
     private final OAuth2LoginSuccessHandler oauth2LoginSuccessHandler;
     private final FormLoginSuccessHandler formLoginSuccessHandler;
     private final AppProperties appProperties;
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final RegisteredClientRepository registeredClientRepository;
 
     // ========================================
     // OAuth2 Authorization Server 필터 체인
@@ -210,17 +215,13 @@ public class SecurityConfig {
     }
 
     @Bean
-    public OAuth2AuthorizationService authorizationService(
-            RegisteredClientRepository registeredClientRepository,
-            JdbcTemplate jdbcTemplate) {
-        return new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
+    public OAuth2AuthorizationService authorizationService() {
+        return new RedisOAuth2AuthorizationService(redisTemplate, registeredClientRepository);
     }
 
     @Bean
-    public OAuth2AuthorizationConsentService authorizationConsentService(
-            JdbcTemplate jdbcTemplate,
-            RegisteredClientRepository registeredClientRepository) {
-        return new JdbcOAuth2AuthorizationConsentService(jdbcTemplate, registeredClientRepository);
+    public OAuth2AuthorizationConsentService authorizationConsentService() {
+        return new RedisOAuth2AuthorizationConsentService(redisTemplate, registeredClientRepository);
     }
 
 
