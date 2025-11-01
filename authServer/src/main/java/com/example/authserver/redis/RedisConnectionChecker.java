@@ -1,4 +1,4 @@
-package com.example.webbffserver.config;
+package com.example.authserver.redis;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
