@@ -1,4 +1,4 @@
-package com.example.authserver.config;
+package com.example.authserver.config.properties;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
