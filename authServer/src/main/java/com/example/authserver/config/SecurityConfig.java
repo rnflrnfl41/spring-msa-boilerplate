@@ -29,6 +29,9 @@ public class SecurityConfig {
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                .requestCache(cache -> cache
+                        .requestCache(new CustomRequestCache())
+                )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/login/**", "/css/**", "/js/**", "/images/**", "/error").permitAll()
                         .anyRequest().authenticated()

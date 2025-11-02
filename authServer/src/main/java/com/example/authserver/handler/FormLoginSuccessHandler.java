@@ -1,8 +1,10 @@
 package com.example.authserver.handler;
 
+import com.example.authserver.config.CustomRequestCache;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
@@ -15,9 +17,10 @@ import java.io.IOException;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class FormLoginSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
-    private final RequestCache requestCache = new HttpSessionRequestCache();
+    private final CustomRequestCache customRequestCache;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
@@ -26,7 +29,7 @@ public class FormLoginSuccessHandler extends SimpleUrlAuthenticationSuccessHandl
         log.info("폼 로그인 성공: {}", authentication.getName());
         
         // 저장된 요청(원래의 authorization request) 복원
-        SavedRequest savedRequest = requestCache.getRequest(request, response);
+        SavedRequest savedRequest = customRequestCache.getRequest(request, response);
         
         if (savedRequest != null) {
 
