@@ -1,5 +1,6 @@
 package com.example.authserver.handler;
 
+import com.example.authserver.config.CustomRequestCache;
 import com.example.authserver.config.properties.AppProperties;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,8 +22,8 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
-    private final RequestCache requestCache = new HttpSessionRequestCache();
     private final AppProperties appProperties;
+    private final CustomRequestCache customRequestCache;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
@@ -40,7 +41,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         }
 
         // 저장된 요청(원래의 authorization request) 복원
-        SavedRequest savedRequest = requestCache.getRequest(request, response);
+        SavedRequest savedRequest = customRequestCache.getRequest(request, response);
         
         if (savedRequest != null) {
             String redirectUrl = savedRequest.getRedirectUrl();
@@ -52,7 +53,6 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
             // 저장된 요청이 없으면 기본 페이지로 리다이렉트
             log.info("저장된 요청 없음, 기본 페이지로 리다이렉트");
             getRedirectStrategy().sendRedirect(request, response, baseRedirectUrl);
-            super.onAuthenticationSuccess(request, response, authentication);
         }
     }
 }
