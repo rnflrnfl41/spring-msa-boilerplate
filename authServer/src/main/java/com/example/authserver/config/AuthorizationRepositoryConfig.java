@@ -3,6 +3,7 @@ package com.example.authserver.config;
 import com.example.authserver.config.properties.AppProperties;
 import com.example.authserver.service.RedisOAuth2AuthorizationConsentService;
 import com.example.authserver.service.RedisOAuth2AuthorizationService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -67,8 +68,9 @@ public class AuthorizationRepositoryConfig {
     @Bean
     public OAuth2AuthorizationService authorizationService(
             RedisTemplate<String, Object> redisTemplate,
-            RegisteredClientRepository registeredClientRepository) {
-        return new RedisOAuth2AuthorizationService(redisTemplate, registeredClientRepository);
+            RegisteredClientRepository registeredClientRepository,
+            ObjectMapper objectMapper) {
+        return new RedisOAuth2AuthorizationService(redisTemplate, registeredClientRepository,objectMapper);
     }
 
     @Bean
