@@ -28,7 +28,7 @@ spring:
             authorization-uri: "${app.base-url}:${app.ports.auth-server}/oauth2/authorize"
             token-uri: "${app.base-url}:${app.ports.auth-server}/oauth2/token"
             user-info-uri: "${app.base-url}:${app.ports.auth-server}/userinfo"
-            jwk-set-uri: "${app.base-url}:${app.ports.auth-server}/.well-known/jwks.json"
+            jwk-set-uri: "${app.base-url}:${app.ports.auth-server}/oauth2/jwks"
 
 server:
   port: ${app.ports.auth-gateway}
