@@ -1,6 +1,6 @@
 package com.example.webbffserver.config;
 
-import com.example.webbffserver.security.filter.JwtFromCookieFilter;
+//import com.example.webbffserver.security.filter.JwtFromCookieFilter;
 import com.example.webbffserver.security.point.JwtAuthEntryPoint;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -24,7 +24,7 @@ import java.util.Arrays;
 public class SecurityConfig {
 
     private final AppProperties appProperties;
-    private final JwtFromCookieFilter jwtFromCookieFilter;
+    //private final JwtFromCookieFilter jwtFromCookieFilter;
     private final JwtAuthEntryPoint jwtAuthEntryPoint;
 
     @Bean
@@ -59,7 +59,7 @@ public class SecurityConfig {
                 )
 
                 // ✅ 쿠키 → Authorization 헤더 변환 필터 추가
-                .addFilterBefore(jwtFromCookieFilter, BearerTokenAuthenticationFilter.class)
+                //.addFilterBefore(jwtFromCookieFilter, BearerTokenAuthenticationFilter.class)
                 .build();
     }
 
