@@ -205,28 +205,16 @@ public class AuthController {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            // 1️⃣ 토큰 쿠키 추출
-            String refreshToken = CookieUtil.getCookie(request, "REFRESH_TOKEN");
+
+            webClient.get()
+                    .uri(appProperties.getAuthServerLogoutUrl())
+                    .cookie("JSESSIONID", Objects.requireNonNull(getAuthServerSessionIdFromCookie(request)))
+                    .retrieve()
+                    .toBodilessEntity()
+                    .block();
 
             // 2️⃣ 쿠키 제거
             CookieUtil.clearTokenCookies(response, /*secure*/ false);
-
-            // 3️⃣ Auth Server에 RefreshToken 폐기 요청 (RFC7009 /oauth2/revoke)
-            if (refreshToken != null) {
-                webClient.post()
-                        .uri(appProperties.getAuthServerRevokeUrl())
-                        .headers(h -> {
-                            h.setBasicAuth("bff-client", "bff-secret"); // 클라이언트 인증
-                            h.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-                        })
-                        .body(BodyInserters.fromFormData("token", refreshToken)
-                                .with("token_type_hint", "refresh_token"))
-                        .retrieve()
-                        .toBodilessEntity()
-                        .block();
-
-                log.info("✅ Auth Server에 RefreshToken revoke 요청 완료");
-            }
 
             // 4️⃣ 응답 반환
             result.put("success", true);
@@ -241,19 +229,6 @@ public class AuthController {
         }
     }
 
-    /**
-     * 쿠키에서 세션 ID 추출
-     */
-    private String getSessionIdFromCookie(HttpServletRequest request) {
-        if (request.getCookies() != null) {
-            for (Cookie cookie : request.getCookies()) {
-                if ("SESSION_ID".equals(cookie.getName())) {
-                    return cookie.getValue();
-                }
-            }
-        }
-        return null;
-    }
 
     private String getAuthServerSessionIdFromCookie(HttpServletRequest request) {
         if (request.getCookies() != null) {
