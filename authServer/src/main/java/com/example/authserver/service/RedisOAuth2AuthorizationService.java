@@ -37,6 +37,8 @@ public class RedisOAuth2AuthorizationService implements OAuth2AuthorizationServi
     private static final String AUTHORIZATION_ACCESS_TOKEN_PREFIX = "oauth2:access_token:";
     private static final String AUTHORIZATION_REFRESH_TOKEN_PREFIX = "oauth2:authorization:refresh_token:";
 
+    // FIXME: 현재 너무 많이 세분화해서 redis에 저장하고있음 간소화 해서 필요한것만 저장 하도록 수정 해야함
+    // FIXME: 로그아웃시 redis에서 저장되어있는 것들 삭제 해아함
 
     @Override
     public void save(OAuth2Authorization authorization) {
