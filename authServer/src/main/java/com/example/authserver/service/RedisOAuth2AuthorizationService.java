@@ -37,8 +37,11 @@ public class RedisOAuth2AuthorizationService implements OAuth2AuthorizationServi
     private static final String AUTHORIZATION_ACCESS_TOKEN_PREFIX = "oauth2:access_token:";
     private static final String AUTHORIZATION_REFRESH_TOKEN_PREFIX = "oauth2:authorization:refresh_token:";
 
-    // FIXME: 현재 너무 많이 세분화해서 redis에 저장하고있음 간소화 해서 필요한것만 저장 하도록 수정 해야함
-    // FIXME: 로그아웃시 redis에서 저장되어있는 것들 삭제 해아함
+
+    // TODO: redis 저장 방식에서 stateless 구조로 가져가야함
+    // TODO: 로그인시 인메모리에 잠시동안만 authorization 객체 저장 후 토큰 발급 후 삭제
+    // TODO: redis에선 blackList로 token revoke (로그아웃시 적용)
+    // TODO: blackList가 쌓이는거에 관한 전략 필요
 
     @Override
     public void save(OAuth2Authorization authorization) {
