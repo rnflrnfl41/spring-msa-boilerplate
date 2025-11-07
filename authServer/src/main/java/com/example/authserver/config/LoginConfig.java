@@ -30,22 +30,4 @@ public class LoginConfig {
                 .build();
         return new InMemoryUserDetailsManager(user);
     }
-
-    /**
-     * 2️⃣ Google OIDC 로그인용
-     * sub, email, picture 등 OIDC Claims 매핑
-     */
-    @Bean
-    public CustomOidcUserService customOidcUserService() {
-        return new CustomOidcUserService();
-    }
-
-    /**
-     * 3️⃣ Kakao 등 일반 OAuth2 Provider용
-     * id, nickname, profile_image 매핑
-     */
-    @Bean
-    public CustomOAuth2UserService customOAuth2UserService() {
-        return new CustomOAuth2UserService();
-    }
 }
