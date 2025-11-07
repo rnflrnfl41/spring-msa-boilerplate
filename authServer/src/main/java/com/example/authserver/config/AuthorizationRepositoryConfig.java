@@ -1,16 +1,12 @@
 package com.example.authserver.config;
 
 import com.example.authserver.config.properties.AppProperties;
-import com.example.authserver.service.RedisOAuth2AuthorizationConsentService;
-import com.example.authserver.service.RedisOAuth2AuthorizationService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.authserver.service.CustomAuthorizationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
-import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
@@ -52,8 +48,8 @@ public class AuthorizationRepositoryConfig {
                         .requireAuthorizationConsent(false)
                         .build())
                 .tokenSettings(TokenSettings.builder()
-                        .accessTokenTimeToLive(Duration.ofMinutes(30))
-                        .refreshTokenTimeToLive(Duration.ofDays(7))
+                        .accessTokenTimeToLive(Duration.ofMinutes(10))
+                        .refreshTokenTimeToLive(Duration.ofDays(1))
                         .reuseRefreshTokens(false)
                         .build())
                 .build();
@@ -64,21 +60,5 @@ public class AuthorizationRepositoryConfig {
 
         return new InMemoryRegisteredClientRepository(clients);
     }
-
-    @Bean
-    public OAuth2AuthorizationService authorizationService(
-            RedisTemplate<String, Object> redisTemplate,
-            RegisteredClientRepository registeredClientRepository,
-            ObjectMapper objectMapper) {
-        return new RedisOAuth2AuthorizationService(redisTemplate, registeredClientRepository,objectMapper);
-    }
-
-    @Bean
-    public OAuth2AuthorizationConsentService authorizationConsentService(
-            RedisTemplate<String, Object> redisTemplate,
-            RegisteredClientRepository registeredClientRepository) {
-        return new RedisOAuth2AuthorizationConsentService(redisTemplate, registeredClientRepository);
-    }
-
 
 }
