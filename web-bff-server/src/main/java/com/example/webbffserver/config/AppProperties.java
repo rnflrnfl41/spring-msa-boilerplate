@@ -47,6 +47,4 @@ public class AppProperties {
 
     public String getAuthServerJwkSetUrl() { return getAuthServerUrl() + "/.well-known/jwks.json"; }
 
-    public String getAuthServerRevokeUrl() { return getAuthServerUrl() + "/oauth2/revoke"; }
-
 }

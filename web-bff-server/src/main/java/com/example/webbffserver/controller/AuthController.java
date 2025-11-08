@@ -13,9 +13,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -27,7 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
-import static com.example.webbffserver.utils.CookieUtil.ACCESS_TOKEN_COOKIE;
+import static com.example.webbffserver.utils.CookieUtil.*;
 
 @Slf4j
 @RestController
@@ -36,7 +34,6 @@ import static com.example.webbffserver.utils.CookieUtil.ACCESS_TOKEN_COOKIE;
 public class AuthController {
 
     private final TokenService tokenService;
-    private final PasswordEncoder passwordEncoder;
     private final AppProperties appProperties;
     private final WebClient webClient;
 
@@ -201,44 +198,42 @@ public class AuthController {
      */
     @PostMapping("/logout")
     public ResponseEntity<Map<String, Object>> logout(HttpServletRequest request, HttpServletResponse response) {
-
         Map<String, Object> result = new HashMap<>();
+
+        String accessToken = CookieUtil.getCookie(request, ACCESS_TOKEN_COOKIE);
+        String refreshToken = CookieUtil.getCookie(request, REFRESH_TOKEN_COOKIE);
+        String jSessionId = CookieUtil.getCookie(request, JSESSIONID_COOKIE);
+
+        if (accessToken == null && refreshToken == null) {
+            CookieUtil.clearTokenCookies(response, /*secure*/ false);
+            result.put("success", false);
+            result.put("message", "쿠키에 저장된 토큰이 없습니다.");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
+        }
 
         try {
 
-            webClient.get()
+            webClient.post()
                     .uri(appProperties.getAuthServerLogoutUrl())
-                    .cookie("JSESSIONID", Objects.requireNonNull(getAuthServerSessionIdFromCookie(request)))
+                    .cookie(JSESSIONID_COOKIE, Objects.requireNonNull(jSessionId))
+                    .cookie(ACCESS_TOKEN_COOKIE, Objects.requireNonNull(accessToken))
+                    .cookie(REFRESH_TOKEN_COOKIE, Objects.requireNonNull(refreshToken))
                     .retrieve()
                     .toBodilessEntity()
                     .block();
 
-            // 2️⃣ 쿠키 제거
-            CookieUtil.clearTokenCookies(response, /*secure*/ false);
-
-            // 4️⃣ 응답 반환
-            result.put("success", true);
-            result.put("message", "로그아웃 완료");
-            return ResponseEntity.ok(result);
-
         } catch (Exception e) {
-            log.error("❌ 로그아웃 중 오류: {}", e.getMessage());
+            log.error("❌ 로그아웃 중 오류: {}", e.getMessage(), e);
+            CookieUtil.clearTokenCookies(response, /*secure*/ false);
             result.put("success", false);
-            result.put("error", e.getMessage());
+            result.put("error", "인증 서버 로그아웃 실패: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
         }
-    }
 
-
-    private String getAuthServerSessionIdFromCookie(HttpServletRequest request) {
-        if (request.getCookies() != null) {
-            for (Cookie cookie : request.getCookies()) {
-                if ("JSESSIONID".equals(cookie.getName())) {
-                    return cookie.getValue();
-                }
-            }
-        }
-        return null;
+        CookieUtil.clearTokenCookies(response, /*secure*/ false);
+        result.put("success", true);
+        result.put("message", "로그아웃 완료");
+        return ResponseEntity.ok(result);
     }
 
     private String buildFrontendRedirectUrl(String status, String error) {
