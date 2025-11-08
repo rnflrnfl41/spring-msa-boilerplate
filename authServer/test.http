@@ -1,8 +1,7 @@
 POST http://localhost:9090/oauth2/token
+Authorization: Basic YmZmLWNsaWVudDpiZmYtc2VjcmV0
 Content-Type: application/x-www-form-urlencoded
 
-client_id=service-a-client&
-client_secret=service-a-secret&
-username=test@example.com&
-password=password&
-scope=read write
+grant_type=refresh_token
+    &refresh_token=hjftUqLkOkJXdjxMVJh61ed_Mz4136H2v0NVROkrOGI1KONfILJdE61jdx-VOxsUK06NT7hdG2sCJcWO1jntDgvMRsTB1KUCBgTgvaN9BpKaCjj6XxxNkvsr4_4CNRfX
+    &client_id=bff-client

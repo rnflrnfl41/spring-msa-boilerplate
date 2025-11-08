@@ -1,6 +1,7 @@
 package com.example.authserver.config;
 
 import com.example.authserver.config.properties.AppProperties;
+import com.example.authserver.handler.CustomLogoutSuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -20,6 +21,7 @@ public class SecurityConfig {
 
     private final OAuth2LoginSuccessHandler oauth2LoginSuccessHandler;
     private final FormLoginSuccessHandler formLoginSuccessHandler;
+    private final CustomLogoutSuccessHandler logoutSuccessHandler;
 
 
     /**
@@ -34,6 +36,7 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/login/**", "/css/**", "/js/**", "/images/**", "/error").permitAll()
+                        .requestMatchers("/api/logout").permitAll()
                         .anyRequest().authenticated()
                 )
                 .formLogin(form -> form
@@ -47,7 +50,7 @@ public class SecurityConfig {
                         .logoutUrl("/logout")
                         .invalidateHttpSession(true)
                         .deleteCookies("JSESSIONID")
-                        .permitAll()
+                        .logoutSuccessHandler(logoutSuccessHandler)
                 );
 
         return http.build();

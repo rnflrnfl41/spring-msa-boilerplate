@@ -1,13 +1,11 @@
 package com.example.authserver.config;
 
 import com.example.authserver.config.properties.AppProperties;
-import com.example.authserver.service.CustomAuthorizationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
-import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
@@ -33,7 +31,7 @@ public class AuthorizationRepositoryConfig {
     public RegisteredClientRepository registeredClientRepository(PasswordEncoder passwordEncoder) {
         List<RegisteredClient> clients = new ArrayList<>();
 
-        // === BFF Client (auth-gateway) ===
+        // === BFF Client ===
         RegisteredClient bffClient = RegisteredClient.withId(UUID.randomUUID().toString())
                 .clientId("bff-client")
                 .clientSecret(passwordEncoder.encode("bff-secret"))

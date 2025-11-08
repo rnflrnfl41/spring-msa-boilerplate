@@ -15,6 +15,7 @@ public class CookieUtil {
     // 쿠키 이름 (한 곳에서만 관리)
     public static final String ACCESS_TOKEN_COOKIE  = "ACCESS_TOKEN";
     public static final String REFRESH_TOKEN_COOKIE = "REFRESH_TOKEN";
+    public static final String JSESSIONID_COOKIE = "JSESSIONID";
 
     // 기본 수명 (필요 시 yml로 뺄 수 있음)
     private static final int ACCESS_MAX_AGE_SECONDS  = 60 * 30;         // 30분
