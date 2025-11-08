@@ -22,7 +22,6 @@ import org.springframework.stereotype.Component;
 
 import java.security.Principal;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Set;
 
 @Slf4j
@@ -35,18 +34,11 @@ public class RedisOAuth2AuthorizationService implements OAuth2AuthorizationServi
     private final ObjectMapper objectMapper;
 
     private static final String AUTHORIZATION_PREFIX = "oauth2:authorization:";      // 메인
-    private static final String AUTHORIZATION_CODE_PREFIX = "oauth2:authorization:code:"; // 인덱스
+    private static final String AUTHORIZATION_CODE_PREFIX = "oauth2:authorization:code:"; // code → id 인덱스
     private static final Duration TTL = Duration.ofMinutes(10);
-
-
-    // TODO: redis 저장 방식에서 stateless 구조로 가져가야함
-    // TODO: 로그인시 인메모리에 잠시동안만 authorization 객체 저장 후 토큰 발급 후 삭제
-    // TODO: redis에선 blackList로 token revoke (로그아웃시 적용)
-    // TODO: blackList가 쌓이는거에 관한 전략 필요
 
     @Override
     public void save(OAuth2Authorization authorization) {
-        // 1️⃣ 먼저 어떤 단계인지 판별
         OAuth2Authorization.Token<OAuth2AuthorizationCode> codeToken =
                 authorization.getToken(OAuth2AuthorizationCode.class);
         OAuth2Authorization.Token<OAuth2AccessToken> accessToken =
@@ -54,11 +46,8 @@ public class RedisOAuth2AuthorizationService implements OAuth2AuthorizationServi
         OAuth2Authorization.Token<OAuth2RefreshToken> refreshToken =
                 authorization.getToken(OAuth2RefreshToken.class);
 
-        // ─────────────────────────────
-        // 단계 1: Authorization Code 발급 직후 (/oauth2/authorize)
-        // ─────────────────────────────
+        // ① 코드 단계
         if (codeToken != null && accessToken == null) {
-
             OAuth2AuthorizationCode code = codeToken.getToken();
 
             OAuth2AuthorizationRequest authRequest =
@@ -82,13 +71,13 @@ public class RedisOAuth2AuthorizationService implements OAuth2AuthorizationServi
                     .expiresAt(code.getExpiresAt())
                     .build();
 
-            // ID → AuthCodeEntity
+            // id → entity
             redisTemplate.opsForValue().set(
                     AUTHORIZATION_PREFIX + entity.getAuthorizationId(),
                     entity,
                     TTL
             );
-            // code → authorizationId (인덱스)
+            // code → id
             redisTemplate.opsForValue().set(
                     AUTHORIZATION_CODE_PREFIX + entity.getCode(),
                     entity.getAuthorizationId(),
@@ -100,23 +89,44 @@ public class RedisOAuth2AuthorizationService implements OAuth2AuthorizationServi
             return;
         }
 
-        // ─────────────────────────────
-        // 단계 2: AccessToken (그리고 RefreshToken)까지 발급된 후 (/oauth2/token)
-        // ─────────────────────────────
+        // ② 토큰 단계
         if (accessToken != null) {
-            // 여기서는 SAS가 authorization 안에 accessToken/refreshToken을 넣은 걸 다시 save()로 넘겨줌
-            // 우리는 이걸 안전한 형태로 변환해서 저장하면 됨
+            // 기존 code 단계 데이터 가져오기
+            Object oldObj = redisTemplate.opsForValue().get(AUTHORIZATION_PREFIX + authorization.getId());
+            AuthCodeEntity oldEntity = null;
+            if (oldObj instanceof AuthCodeEntity e) {
+                oldEntity = e;
+            } else if (oldObj != null) {
+                try {
+                    oldEntity = objectMapper.convertValue(oldObj, AuthCodeEntity.class);
+                } catch (Exception ex) {
+                    log.warn("⚠️ cannot convert prev auth to AuthCodeEntity: {}", ex.getMessage());
+                }
+            }
+
+            Authentication principal = (oldEntity != null)
+                    ? (Authentication) oldEntity.getPrincipal()
+                    : authorization.getAttribute(Principal.class.getName());
+
+            OAuth2AuthorizationRequest authRequest = (oldEntity != null)
+                    ? oldEntity.getAuthorizationRequest()
+                    : authorization.getAttribute(OAuth2AuthorizationRequest.class.getName());
+
+            Set<String> scopes = (oldEntity != null)
+                    ? oldEntity.getScopes()
+                    : authorization.getAuthorizedScopes();
 
             TokenEntity.TokenEntityBuilder builder = TokenEntity.builder()
                     .authorizationId(authorization.getId())
                     .registeredClientId(authorization.getRegisteredClientId())
                     .principalName(authorization.getPrincipalName())
-                    .scopes(authorization.getAuthorizedScopes())
+                    .principal(principal)
+                    .authorizationRequest(authRequest)
+                    .scopes(scopes)
                     .accessTokenValue(accessToken.getToken().getTokenValue())
                     .accessTokenIssuedAt(accessToken.getToken().getIssuedAt())
                     .accessTokenExpiresAt(accessToken.getToken().getExpiresAt());
 
-            // refresh token 있으면 같이
             if (refreshToken != null) {
                 builder.refreshTokenValue(refreshToken.getToken().getTokenValue())
                         .refreshTokenIssuedAt(refreshToken.getToken().getIssuedAt())
@@ -125,26 +135,33 @@ public class RedisOAuth2AuthorizationService implements OAuth2AuthorizationServi
 
             TokenEntity tokenEntity = builder.build();
 
-            // ID → TokenEntity
+            // 🔴 여기서 기존 code 인덱스는 "code 값" 으로 지워야 함
+            if (oldEntity != null && oldEntity.getCode() != null) {
+                redisTemplate.delete(AUTHORIZATION_CODE_PREFIX + oldEntity.getCode());
+            }
+
+            // id → tokenEntity 로 덮어쓰기
             redisTemplate.opsForValue().set(
                     AUTHORIZATION_PREFIX + authorization.getId(),
                     tokenEntity,
                     TTL
             );
 
+            log.debug("✅ [TOKEN-STAGE] Saved TokenEntity (id={}, hasRefreshToken={})",
+                    authorization.getId(),
+                    tokenEntity.getRefreshTokenValue() != null);
             return;
         }
 
-        // 그 외 상태는 일단 로그만
         log.debug("⚠️ save(OAuth2Authorization) called with unsupported state: id={}", authorization.getId());
     }
 
     @Override
     public void remove(OAuth2Authorization authorization) {
-        // 1️⃣ AuthCodeEntity 제거
+        // 메인 삭제
         redisTemplate.delete(AUTHORIZATION_PREFIX + authorization.getId());
 
-        // 2️⃣ Authorization Code 인덱스 제거
+        // code 인덱스도 삭제
         OAuth2Authorization.Token<OAuth2AuthorizationCode> codeToken =
                 authorization.getToken(OAuth2AuthorizationCode.class);
 
@@ -153,8 +170,7 @@ public class RedisOAuth2AuthorizationService implements OAuth2AuthorizationServi
             redisTemplate.delete(AUTHORIZATION_CODE_PREFIX + codeValue);
             log.debug("🗑️ Removed AuthCodeEntity (id={}, code={})", authorization.getId(), codeValue);
         } else {
-            // code가 null인 경우도 존재 (이미 AccessToken 단계일 수 있음)
-            // 인덱스 키 전체를 스캔해서 authorizationId로 일치하는 항목 제거
+            // 토큰 단계에서 호출된 경우: 인덱스 전체 스캔해서 이 id인 것만 지움
             Set<String> keys = redisTemplate.keys(AUTHORIZATION_CODE_PREFIX + "*");
             if (keys != null) {
                 for (String key : keys) {
@@ -173,60 +189,112 @@ public class RedisOAuth2AuthorizationService implements OAuth2AuthorizationServi
         Object obj = redisTemplate.opsForValue().get(AUTHORIZATION_PREFIX + id);
         if (obj == null) return null;
 
+        // 🔹 토큰 단계인지 코드 단계인지 구분
+        if (obj instanceof TokenEntity tokenEntity) {
+            return toAuthorizationFromToken(tokenEntity);
+        }
+
         AuthCodeEntity entity = (obj instanceof AuthCodeEntity e)
                 ? e
                 : objectMapper.convertValue(obj, AuthCodeEntity.class);
 
-        RegisteredClient client = clientRepository.findById(entity.getRegisteredClientId());
-        if (client == null) return null;
-
-        OAuth2AuthorizationCode authCode = new OAuth2AuthorizationCode(
-                entity.getCode(), entity.getIssuedAt(), entity.getExpiresAt()
-        );
-
-        return OAuth2Authorization.withRegisteredClient(client)
-                .id(entity.getAuthorizationId())
-                .principalName(entity.getPrincipalName())
-                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .authorizedScopes(entity.getScopes())
-                .attribute(OAuth2AuthorizationRequest.class.getName(), entity.getAuthorizationRequest())
-                .attribute(Principal.class.getName(), entity.getPrincipal())
-                .token(authCode)
-                .build();
+        return toAuthorizationFromCode(entity);
     }
 
     @Override
     public OAuth2Authorization findByToken(String token, OAuth2TokenType tokenType) {
-        if (!OAuth2ParameterNames.CODE.equals(tokenType.getValue())) return null;
 
-        // code → authorizationId 매핑 조회
-        String authorizationId = (String) redisTemplate.opsForValue().get(AUTHORIZATION_CODE_PREFIX + token);
-        if (authorizationId == null) return null;
+        // 1) 코드로 찾는 경우
+        if (tokenType != null && OAuth2ParameterNames.CODE.equals(tokenType.getValue())) {
+            String authorizationId = (String) redisTemplate.opsForValue().get(AUTHORIZATION_CODE_PREFIX + token);
+            if (authorizationId == null) return null;
 
-        // authorizationId로 AuthCodeEntity 복원
-        Object obj = redisTemplate.opsForValue().get(AUTHORIZATION_PREFIX + authorizationId);
-        if (obj == null) return null;
+            Object obj = redisTemplate.opsForValue().get(AUTHORIZATION_PREFIX + authorizationId);
+            if (obj == null) return null;
 
-        AuthCodeEntity entity = (obj instanceof AuthCodeEntity e)
-                ? e
-                : objectMapper.convertValue(obj, AuthCodeEntity.class);
+            if (obj instanceof AuthCodeEntity e) {
+                return toAuthorizationFromCode(e);
+            } else if (obj instanceof TokenEntity te) {
+                return toAuthorizationFromToken(te);
+            } else {
+                // fallback
+                return toAuthorizationFromCode(objectMapper.convertValue(obj, AuthCodeEntity.class));
+            }
+        }
 
-        RegisteredClient client = clientRepository.findById(entity.getRegisteredClientId());
+        // 2) access token / refresh token 으로 찾는 경우
+        if (tokenType != null &&
+                (OAuth2TokenType.ACCESS_TOKEN.equals(tokenType)
+                        || OAuth2TokenType.REFRESH_TOKEN.equals(tokenType))) {
+
+            Set<String> keys = redisTemplate.keys(AUTHORIZATION_PREFIX + "*");
+            if (keys != null) {
+                for (String key : keys) {
+                    Object obj = redisTemplate.opsForValue().get(key);
+                    if (obj instanceof TokenEntity te) {
+                        if (token.equals(te.getAccessTokenValue())
+                                || token.equals(te.getRefreshTokenValue())) {
+                            return toAuthorizationFromToken(te);
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    // ================== 변환 메서드 ==================
+
+    private OAuth2Authorization toAuthorizationFromCode(AuthCodeEntity e) {
+        RegisteredClient client = clientRepository.findById(e.getRegisteredClientId());
         if (client == null) return null;
 
         OAuth2AuthorizationCode authCode = new OAuth2AuthorizationCode(
-                entity.getCode(), entity.getIssuedAt(), entity.getExpiresAt()
+                e.getCode(), e.getIssuedAt(), e.getExpiresAt()
         );
 
         return OAuth2Authorization.withRegisteredClient(client)
-                .id(entity.getAuthorizationId())
-                .principalName(entity.getPrincipalName())
+                .id(e.getAuthorizationId())
+                .principalName(e.getPrincipalName())
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .authorizedScopes(entity.getScopes())
-                .attribute(OAuth2AuthorizationRequest.class.getName(), entity.getAuthorizationRequest())
-                .attribute(Principal.class.getName(), entity.getPrincipal())
+                .authorizedScopes(e.getScopes())
+                .attribute(OAuth2AuthorizationRequest.class.getName(), e.getAuthorizationRequest())
+                .attribute(Principal.class.getName(), e.getPrincipal())
                 .token(authCode)
                 .build();
     }
 
+    private OAuth2Authorization toAuthorizationFromToken(TokenEntity e) {
+        RegisteredClient client = clientRepository.findById(e.getRegisteredClientId());
+        if (client == null) return null;
+
+        OAuth2Authorization.Builder builder = OAuth2Authorization.withRegisteredClient(client)
+                .id(e.getAuthorizationId())
+                .principalName(e.getPrincipalName())
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE) // 최초 grant는 code였으므로
+                .authorizedScopes(e.getScopes())
+                .attribute(OAuth2AuthorizationRequest.class.getName(), e.getAuthorizationRequest())
+                .attribute(Principal.class.getName(), e.getPrincipal());
+
+        OAuth2AccessToken accessToken = new OAuth2AccessToken(
+                OAuth2AccessToken.TokenType.BEARER,
+                e.getAccessTokenValue(),
+                e.getAccessTokenIssuedAt(),
+                e.getAccessTokenExpiresAt()
+        );
+        builder.token(accessToken);
+
+        if (e.getRefreshTokenValue() != null) {
+            OAuth2RefreshToken refreshToken = new OAuth2RefreshToken(
+                    e.getRefreshTokenValue(),
+                    e.getRefreshTokenIssuedAt(),
+                    e.getRefreshTokenExpiresAt()
+            );
+            builder.token(refreshToken);
+        }
+
+        return builder.build();
+    }
 }
+
