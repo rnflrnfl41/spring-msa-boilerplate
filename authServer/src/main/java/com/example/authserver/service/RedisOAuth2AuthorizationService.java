@@ -29,6 +29,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RedisOAuth2AuthorizationService implements OAuth2AuthorizationService {
 
+    //TODO: 현재 token refresh가 안됌 이유는 openid를 참조하기 때문 scope를 폼로그인일때는 openId를 주면 안되는대 클라이언트가 고정되어있어서 그럼 수정 필요(test.http로 테스트 해보면 됌)
+
     private final RedisTemplate<String, Object> redisTemplate;
     private final RegisteredClientRepository clientRepository;
     private final ObjectMapper objectMapper;
