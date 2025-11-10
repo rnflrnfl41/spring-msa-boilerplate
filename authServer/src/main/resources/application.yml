@@ -59,20 +59,20 @@ spring:
   h2:
     console:
       enabled: true
-#  jpa:
-#    properties:
-#      hibernate:
-#        dialect: org.hibernate.dialect.MySQL8Dialect
-#        format_sql: true
-#        jdbc:
-#          batch_size: 20
-#        order_updates: true
-#        order_insert: true
-#    hibernate:
-#      naming:
-#        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
-#      ddl-auto: none
-#    show-sql: true
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: true
+        jdbc:
+          batch_size: 20
+        order_updates: true
+        order_insert: true
+    hibernate:
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+      ddl-auto: none
+    show-sql: true
 
 #jwt:
 #  token:
