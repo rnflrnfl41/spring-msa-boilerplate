@@ -31,8 +31,8 @@ public class AuthorizationServerConfig {
         // oidc는 ID Token으로 사용자 정보를 가져와서 인증 가능
         //OAuth2: “이 사용자가 API 자원에 접근할 수 있는 권한이 있는가?” → 인가(Authorization) 중심
         //OIDC: “이 사용자가 누구인가?” → 인증(Authentication) 중심
-        http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
-                .oidc(Customizer.withDefaults());
+       /* http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
+                .oidc(Customizer.withDefaults());*/
 
         http.csrf(csrf -> csrf.ignoringRequestMatchers("/oauth2/token", "/oauth2/revoke"))
                 .formLogin(Customizer.withDefaults());

@@ -22,7 +22,7 @@ spring:
             client-secret: "bff-secret"
             authorization-grant-type: authorization_code
             redirect-uri: "${app.base-url}:${app.ports.auth-gateway}/api/auth/callback"
-            scope: openid,profile,email
+            scope: profile,email
         provider:
           auth-server:
             authorization-uri: "${app.base-url}:${app.ports.auth-server}/oauth2/authorize"
