@@ -37,4 +37,8 @@ public class AppProperties {
         return  getAuthGatewayUrl() + "/api/auth/callback";
     }
 
+    public String getSignupUrl() {
+        return  getAuthServerUrl() + "/signup";
+    }
+
 }
