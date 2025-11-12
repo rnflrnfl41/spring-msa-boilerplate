@@ -35,7 +35,7 @@ public class SecurityConfig {
                         .requestCache(new CustomRequestCache())
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login/**", "/css/**", "/js/**", "/images/**", "/error").permitAll()
+                        .requestMatchers("/login/**","/signup/**", "/css/**", "/js/**", "/images/**", "/error").permitAll()
                         .requestMatchers("/api/logout").permitAll()
                         .anyRequest().authenticated()
                 )

@@ -5,6 +5,7 @@ import lombok.*;
 import org.antlr.v4.runtime.misc.NotNull;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.sql.Types;
 import java.time.LocalDateTime;
@@ -22,24 +23,40 @@ public class UserInfo {
     @JdbcTypeCode(Types.CHAR) //JPA가 UUID를 바이트 배열이 아닌, 36자리의 문자열로 처리
     private UUID id;
 
-    @NotNull
     @Column(name = "login_id", nullable = false, length = 50)
     private String loginId;
 
-    @NotNull
     @Column(name = "password", nullable = false, columnDefinition = "TEXT")
     private String password;
 
     @Column(name = "name", length = 50)
     private String name;
 
-    @NotNull
+    private String email;
+
+    private String phone;
+
+    @Column(name = "provider", length = 50)
+    private String provider;
+
+    @Column(name = "provider_id", length = 100)
+    private String providerId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 10)
     private Role role;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 10)
+    private UserStatus status;
+
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @CreationTimestamp
     private LocalDateTime createdAt;
+
+    @Column(name = "update_at")
+    @UpdateTimestamp
+    private LocalDateTime updateAt;
 
 }

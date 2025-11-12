@@ -1,4 +1,4 @@
-package com.example.authserver.config.info;
+package com.example.authserver.handler.info;
 
 import java.util.Map;
 

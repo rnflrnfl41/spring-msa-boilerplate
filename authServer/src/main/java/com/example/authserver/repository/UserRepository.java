@@ -10,4 +10,6 @@ public interface UserRepository extends JpaRepository<UserInfo, UUID> {
 
     Optional<UserInfo> findByLoginId(String loginId);
 
+    Optional<UserInfo> findByEmailAndProviderAndProviderId(String email,String provider, String providerId);
+
 }
