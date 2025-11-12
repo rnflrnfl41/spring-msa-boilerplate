@@ -1,6 +1,4 @@
-package com.example.authserver.config.info;
-
-import org.springframework.security.oauth2.core.user.OAuth2User;
+package com.example.authserver.handler.info;
 
 import java.util.Map;
 

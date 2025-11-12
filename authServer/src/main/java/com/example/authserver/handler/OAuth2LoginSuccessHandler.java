@@ -1,11 +1,9 @@
 package com.example.authserver.handler;
 
 import com.example.authserver.config.CustomRequestCache;
-import com.example.authserver.config.info.OAuth2UserInfo;
-import com.example.authserver.config.info.OAuth2UserInfoFactory;
+import com.example.authserver.handler.info.OAuth2UserInfo;
+import com.example.authserver.handler.info.OAuth2UserInfoFactory;
 import com.example.authserver.config.properties.AppProperties;
-import com.example.authserver.entity.UserInfo;
-import com.example.authserver.entity.UserSocialAccount;
 import com.example.authserver.repository.UserRepository;
 import com.example.authserver.repository.UserSocialAccountRepository;
 import jakarta.servlet.ServletException;
@@ -15,17 +13,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
-import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
-import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.security.web.savedrequest.SavedRequest;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.Optional;
 
 @Slf4j
 @Component
