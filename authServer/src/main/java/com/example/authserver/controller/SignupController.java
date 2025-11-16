@@ -47,7 +47,7 @@ public class SignupController {
             );
             model.addAttribute("form", form);
         } else {
-            model.addAttribute("form", new SignupRequest("", "", "", "", ""));
+            model.addAttribute("form", new SignupRequest("", "", "", "", "",""));
         }
         return "signup";
     }
@@ -59,9 +59,6 @@ public class SignupController {
         model.addAttribute("isSocial", false);
 
         validateLocalSignup(request, bindingResult);
-        if (!request.password().equals(request.passwordConfirm())) {
-            bindingResult.rejectValue("passwordConfirm", "password.mismatch", "비밀번호가 일치하지 않습니다.");
-        }
 
         if (bindingResult.hasErrors()) {
             return "signup";

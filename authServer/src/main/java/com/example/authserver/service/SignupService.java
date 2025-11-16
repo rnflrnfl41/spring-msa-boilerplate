@@ -23,19 +23,32 @@ public class SignupService {
 
     public void signupLocal(SignupRequest request) {
         log.info("로컬 회원가입 처리 loginId={}, email={}", request.loginId(), request.email());
-        UserInfo user = modelMapper.map(request, UserInfo.class);
-        user.setPassword(passwordEncoder.encode(request.password()));
-        user.setRole(Role.ROLE_USER);
-        user.setStatus(UserStatus.ACTIVE);
+        UserInfo user = UserInfo.builder()
+                .loginId(request.loginId())
+                .email(request.email())
+                .name(request.name())
+                .password(passwordEncoder.encode(request.password()))
+                .phone(request.phone())
+                .role(Role.ROLE_USER)
+                .status(UserStatus.ACTIVE)
+                .build();
         userRepository.save(user);
     }
 
     public void signupSocial(SocialSignupRequest request) {
         log.info("소셜 회원가입 처리 provider={}, providerId={}, email={}",
                 request.provider(), request.providerId(), request.email());
-        UserInfo user = modelMapper.map(request, UserInfo.class);
-        user.setRole(Role.ROLE_USER);
-        user.setStatus(UserStatus.ACTIVE);
+
+        UserInfo user = UserInfo.builder()
+                .email(request.email())
+                .name(request.name())
+                .phone(request.phone())
+                .provider(request.provider())
+                .providerId(request.providerId())
+                .role(Role.ROLE_USER)
+                .status(UserStatus.ACTIVE)
+                .build();
+        
         userRepository.save(user);
     }
 }

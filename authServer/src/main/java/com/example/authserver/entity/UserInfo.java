@@ -14,6 +14,9 @@ import java.util.UUID;
 @Getter
 @Setter
 @Entity
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 @Table(name = "users")
 public class UserInfo {
 
@@ -23,10 +26,10 @@ public class UserInfo {
     @JdbcTypeCode(Types.CHAR) //JPA가 UUID를 바이트 배열이 아닌, 36자리의 문자열로 처리
     private UUID id;
 
-    @Column(name = "login_id", nullable = false, length = 50)
+    @Column(name = "login_id", length = 50)
     private String loginId;
 
-    @Column(name = "password", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "password", columnDefinition = "TEXT")
     private String password;
 
     @Column(name = "name", length = 50)
