@@ -25,6 +25,9 @@ public class AuthorizationServerConfig {
     @Bean
     public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
         OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
+        
+        //TODO: OIDC 유저 세팅 해서 유저 정보를 받는 로직 만들어야함
+        //TODO: oidc 사용해서 openid를 주면 refreshToken할때 주의 뭔가 있어서 에러 날가능성 있음
 
         // scope로 openid를 받기 위해선 oidc 설정을 따로 해줘야함
         // oidc란 기본 oauth2는 접근 권한을 주지만 사용자 인증은 하지않는대
