@@ -247,6 +247,11 @@
             <p>아이디와 비밀번호를 확인해주세요.</p>
         </div>
 
+        <!-- 회원가입 성공 메시지 표시 -->
+        <div th:if="${param.signupSuccess}" class="success-message">
+            회원가입이 완료되었습니다. 로그인해 주세요.
+        </div>
+
         <!-- 성공 메시지 표시 -->
         <div th:if="${param.logout}" class="success-message">
             로그아웃되었습니다.

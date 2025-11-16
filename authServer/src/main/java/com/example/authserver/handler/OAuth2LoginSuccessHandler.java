@@ -46,7 +46,6 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
 
         log.info("소셜 로그인 성공 [{}]: email={}, name={}, providerId={}", provider, email, name, providerId);
 
-        //TODO: 소셜로그인 사용자 정보 DB에 넣는작업 추가해야함(signup으로 redirect 시키고 기존 authorization 객체 삭제 및 회원가입 후 재로그인 로직 넣어야함)
         // ✅ 유저 존재 여부 확인
         Optional<UserInfo> existingSocial = userRepository.findByEmailAndProviderAndProviderId(email,provider,providerId);
 

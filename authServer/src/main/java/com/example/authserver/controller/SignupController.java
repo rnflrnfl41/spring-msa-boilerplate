@@ -21,8 +21,6 @@ import java.util.regex.Pattern;
 public class SignupController {
 
     //TODO: validation 강화(이름 3글자 이상 등등)
-    //TODO: 회원가입후 소셜로그인이면 기존 연결 끊고 재로그인 유도
-    //TODO: 회원 가입 완려된후 메세지 출력하는 부분 만들어야함
 
     private final SignupService signupService;
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
@@ -47,7 +45,7 @@ public class SignupController {
             );
             model.addAttribute("form", form);
         } else {
-            model.addAttribute("form", new SignupRequest("", "", "", "", ""));
+            model.addAttribute("form", new SignupRequest("", "", "", "", "",""));
         }
         return "signup";
     }
@@ -59,9 +57,6 @@ public class SignupController {
         model.addAttribute("isSocial", false);
 
         validateLocalSignup(request, bindingResult);
-        if (!request.password().equals(request.passwordConfirm())) {
-            bindingResult.rejectValue("passwordConfirm", "password.mismatch", "비밀번호가 일치하지 않습니다.");
-        }
 
         if (bindingResult.hasErrors()) {
             return "signup";
