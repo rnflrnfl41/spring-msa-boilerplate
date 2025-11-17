@@ -9,17 +9,24 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
 @Getter
 @NoArgsConstructor
-public class CustomUserDetails implements UserDetails {
+public class CustomUserDetails implements UserDetails, Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     private UUID id;
     private String loginId;
     private String username;
+    private String email;
+    private String phone;
     private String password;
     private Role role;
 
@@ -29,12 +36,16 @@ public class CustomUserDetails implements UserDetails {
             @JsonProperty("id") UUID id,
             @JsonProperty("loginId") String loginId,
             @JsonProperty("username") String username,
+            @JsonProperty("email") String email,
+            @JsonProperty("phone") String phone,
             @JsonProperty("password") String password,
             @JsonProperty("role") Role role
     ) {
         this.id = id;
         this.loginId = loginId;
         this.username = username;
+        this.email = email;
+        this.phone = phone;
         this.password = password;
         this.role = role;
     }
@@ -44,6 +55,8 @@ public class CustomUserDetails implements UserDetails {
         this.id = user.getId();
         this.loginId = user.getLoginId();
         this.username = user.getName();
+        this.email = user.getEmail();
+        this.phone = user.getPhone();
         this.password = user.getPassword();
         this.role = user.getRole();
     }
