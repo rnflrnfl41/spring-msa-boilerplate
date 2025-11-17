@@ -47,4 +47,6 @@ public class AppProperties {
 
     public String getAuthServerJwkSetUrl() { return getAuthServerUrl() + "/.well-known/jwks.json"; }
 
+    public String getAuthServerUserInfoUrl() { return getAuthServerUrl() + "/userinfo"; }
+
 }

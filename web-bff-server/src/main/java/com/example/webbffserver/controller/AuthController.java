@@ -117,7 +117,7 @@ public class AuthController {
                     .queryParam("response_type", "code")
                     .queryParam("client_id", "bff-client")
                     .queryParam("redirect_uri", appProperties.getAuthGatewayCallbackUrl())
-                    .queryParam("scope", "profile email")
+                    .queryParam("scope", "openid profile email")
                     .queryParam("state", UUID.randomUUID().toString()) // CSRF 방지
                     .build().toUriString();
 
