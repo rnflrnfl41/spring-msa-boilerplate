@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
 
+    //TODO: 내가 만든 authorization 객체에 맞춰서 구글이나 카카오에서 받아온 객체 변환 해야함
     private final UserRepository userRepository;
 
     @Override

@@ -6,6 +6,7 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequ
 
 import java.security.Principal;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Set;
 
 @Data
@@ -18,6 +19,7 @@ public class TokenEntity {
     private OAuth2AuthorizationRequest authorizationRequest;
     private Set<String> scopes;
 
+    private Set<String> accessTokenScopes;
     private String accessTokenValue;
     private Instant accessTokenIssuedAt;
     private Instant accessTokenExpiresAt;
@@ -25,4 +27,9 @@ public class TokenEntity {
     private String refreshTokenValue;
     private Instant refreshTokenIssuedAt;
     private Instant refreshTokenExpiresAt;
+
+    private String idTokenValue;
+    private Instant idTokenIssuedAt;
+    private Instant idTokenExpiresAt;
+    private Map<String,Object> idTokenClaims;
 }
