@@ -103,7 +103,8 @@ public class TokenService {
                         log.error("❌ Refresh 요청 실패: {}", clientResponse.statusCode());
                         return Mono.error(new RuntimeException("Token refresh failed"));
                     })
-                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {
+                    })
                     .block();
 
             if (tokenResponse == null || !tokenResponse.containsKey("access_token")) return false;
@@ -126,56 +127,20 @@ public class TokenService {
      */
     public Map<String, Object> getUserInfo(String accessToken) {
         try {
-            // 1️⃣ JWT 토큰 파싱
-            JWT jwt = JWTParser.parse(accessToken);
-            JWTClaimsSet claimsSet = jwt.getJWTClaimsSet();
-            
-            // 2️⃣ 토큰 유효성 검증
-            if (isTokenExpired(claimsSet)) {
-                log.error("❌ JWT 토큰 만료됨");
-                return null;
-            }
-            
-            // 3️⃣ 발급자 검증 (Auth Server에서 발급된 토큰인지 확인)
-            String issuer = claimsSet.getIssuer();
-            if (issuer == null || !issuer.equals(appProperties.getAuthServerUrl())) {
-                log.error("❌ 잘못된 토큰 발급자: {}", issuer);
-                return null;
-            }
-            
-            // 4️⃣ 사용자 정보 추출
-            Map<String, Object> userInfo = new HashMap<>();
-            
-            // 표준 JWT Claims
-            String sub = claimsSet.getSubject();
-            String email = claimsSet.getStringClaim("email");
-            String name = claimsSet.getStringClaim("name");
-            String picture = claimsSet.getStringClaim("picture");
-            Boolean emailVerified = claimsSet.getBooleanClaim("email_verified");
-            
-            // 사용자 정보 설정
-            userInfo.put("sub", sub != null ? sub : "unknown");
-            userInfo.put("email", email != null ? email : "unknown@example.com");
-            userInfo.put("name", name != null ? name : "Unknown User");
-            userInfo.put("picture", picture != null ? picture : "https://example.com/default-avatar.jpg");
-            userInfo.put("email_verified", emailVerified != null ? emailVerified : false);
-            
-            // 추가 정보 (발급자, 만료시간 등)
-            userInfo.put("issuer", claimsSet.getIssuer());
-            userInfo.put("issued_at", claimsSet.getIssueTime());
-            userInfo.put("expires_at", claimsSet.getExpirationTime());
-            
-            log.info("✅ 사용자 정보 조회 성공 (JWT 기반): {} ({})", name, email);
-            return userInfo;
-            
+            return webClient.get()
+                    .uri(appProperties.getAuthServerUserInfoUrl())
+                    .headers(headers -> headers.setBearerAuth(accessToken))
+                    .retrieve()
+                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {
+                    })
+                    .block();
+
         } catch (Exception e) {
-            log.error("❌ JWT 토큰 파싱 실패: {}", e.getMessage());
-            
-            // JWT 파싱 실패 시 null 반환 (보안상 fallback 데이터 사용하지 않음)
+            log.error("❌ userInfo 조회 실패: {}", e.getMessage());
             return null;
         }
     }
-    
+
     /**
      * JWT 토큰 만료 여부 확인
      */
