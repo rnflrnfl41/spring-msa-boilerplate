@@ -1,535 +1,264 @@
 # Spring MSA Boilerplate
 
-Spring Boot 기반의 마이크로서비스 아키텍처 보일러플레이트 프로젝트입니다. OAuth2 인증 서버와 BFF(Backend for Frontend) 패턴을 중심으로 구성되어 있습니다.
+> Spring Boot 3.3 + Spring Cloud 2023 기반의 OAuth2/OIDC 인증 서버, BFF(Backend for Frontend), API Gateway, 서비스 디스커버리, 공통 인프라 라이브러리를 한 번에 제공하는 마이크로서비스 스타터 키트입니다.
 
-## 🏗️ 아키텍처 개요
+## 프로젝트 한눈에
+- OAuth2 Authorization Server(authServer)와 Web BFF(web-bff-server) 조합으로 SPA·모바일 프런트가 토큰을 직접 다루지 않고도 로그인/로그아웃을 수행
+- Spring Cloud Gateway + Netflix Eureka로 서비스 라우팅·디스커버리를 구성하고 확장 가능한 백엔드 서비스 진입점을 제공
+- Redis(세션/Authorization Store) + MySQL(사용자 저장소) + HttpOnly 쿠키 전략으로 토큰 탈취 위험을 줄인 인증 구조
+- `commonLib`, `infra` 모듈을 통해 모든 서비스에서 동일한 상수/HTTP 상태/직렬화/암호화/웹 클라이언트 설정을 재사용
+- Docker Compose, Gradle 멀티 모듈, Actuator, WebClient 등 운영에 필요한 기본 도구 포함
+- Google/Kakao 소셜 로그인 + 자체 회원가입(Thymeleaf) + 토큰 블랙리스트/Refresh 자동화까지 기본 제공
 
+## 전체 아키텍처
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Frontend      │    │  Web BFF Server │    │   Auth Server   │
-│   (React/Vue)   │◄──►│   (Port: 9091)  │◄──►│   (Port: 9090)  │
-│   Port: 3000    │    │   OAuth2 Client │    │  OAuth2 AuthZ   │
-└─────────────────┘    └────────┬────────┘    └─────────┬───────┘
-                                │                       │
-                                │                       │ (OAuth2 Authorization 상태 저장)
-                                │                       ▼
-                                │                ┌──────────────┐
-                                │                │   Redis      │
-                                │                │   Port: 6379 │
-                                │                └──────────────┘
-                                │
-                                │ (API 요청 프록시)
-                                ▼
-                       ┌─────────────────┐
-                       │   API Gateway   │◄──────┐
-                       │   Port: 8080    │       │ (서비스 디스커버리)
-                       └────────┬────────┘       │
-                                │                │
-                                │ (라우팅)        │
-                                ▼                │
-                       ┌─────────────────┐       │
-                       │ Backend Services│       │
-                       │  (향후 구현 예정) │       │
-                       └─────────────────┘       │
-                                                 │
-                                       ┌─────────┴───────┐
-                                       │   Eureka Server │
-                                       │   Port: 8761    │
-                                       └─────────────────┘
+                ┌────────────────────┐
+                │   Frontend (SPA)   │ 3000
+                └──────────┬─────────┘
+                           │ CORS + HttpOnly 쿠키
+                           ▼
+┌────────────────────┐ 9091 ┌────────────────────┐ 9090 ┌────────────────────┐
+│  Web BFF Server    │◄────►│  Auth Server       │◄────►│ Google / Kakao     │
+│  (OAuth2 Client    │      │  (OAuth2 + OIDC)   │      │ 외부 IdP           │
+└──────────┬─────────┘      └──────────┬─────────┘      └────────────────────┘
+           │ JWT Proxy                 │ Redis Authorization + MySQL User Store
+           │                           ▼
+           │                 ┌────────────────────┐ 6379
+           │                 │       Redis        │
+           │                 └────────────────────┘
+           ▼
+┌────────────────────┐ 8080 ┌────────────────────┐ 8761 ┌────────────────────┐
+│  API Gateway       │◄────►│  Eureka Server     │      │ Backend Services    │ (TODO 확장)
+│  (Spring Cloud G/W)│      │  (Discovery)       │─────►│ (주문/상품 등)      │
+└────────────────────┘      └────────────────────┘      └────────────────────┘
 ```
 
-## 📦 모듈 구성
+## 서비스 & 포트 요약
 
-### 1. **authServer** (OAuth2 Authorization Server) - 포트 9090
-- **역할**: OAuth2 표준을 준수하는 인증 서버
-- **주요 기능**:
-  - Google, Kakao 소셜 로그인 지원
-  - JWT 토큰 발급 및 검증
-  - OAuth2 Authorization Code Flow 구현
-  - OIDC (OpenID Connect) 지원
-  - 사용자 인증 및 권한 관리
-  - Redis를 이용한 Authorization 상태 관리
-  - MySQL 데이터베이스 연동 (사용자 정보 저장)
+| 모듈 | 설명 | 기본 포트 | 핵심 기술 |
+| --- | --- | --- | --- |
+| `authServer` | OAuth2 Authorization Server + 사용자 관리 | 9090 | Spring Authorization Server, Redis, JPA(MySQL), Thymeleaf |
+| `web-bff-server` | SPA 전용 BFF (OAuth2 Client + Resource Server) | 9091 | Spring Security, WebClient, HttpOnly 쿠키, JWT 검증 |
+| `apiGateway` | 외부 진입점 / 라우팅 | 8080 | Spring Cloud Gateway, Netty, Global CORS |
+| `eurekaServer` | 서비스 디스커버리 | 8761 | Netflix Eureka |
+| `commonLib` | 상수/에러코드/JWK 유틸 | - | Java Library, Nimbus JOSE |
+| `infra` | Redis/WebClient/ObjectMapper/Encoder 등 공통 Bean | - | Java Library, @Enable* Import |
 
-### 2. **web-bff-server** (BFF 서버) - 포트 9091
-- **역할**: Frontend와 Backend 사이의 중간 계층 (Backend for Frontend)
-- **주요 기능**:
-  - OAuth2 클라이언트 역할
-  - HttpOnly 쿠키 기반 토큰 관리
-  - JWT 토큰 검증 (Resource Server)
-  - 인증 상태 및 사용자 정보 제공
-  - CORS 설정 및 보안 강화
-  - 토큰 자동 갱신 지원
+## 모듈 상세
 
-### 3. **apiGateway** (API Gateway) - 포트 8080
-- **역할**: 마이크로서비스 진입점
-- **주요 기능**:
-  - 서비스 라우팅 및 로드 밸런싱
-  - Eureka 서비스 디스커버리 연동
-  - CORS 설정
-  - Spring Cloud Gateway 기반
+### authServer (`authServer/`)
+- `AuthorizationServerConfig`, `SecurityConfig`에서 Authorization Server + Form/OAuth2 로그인 필터 체인 분리, OIDC(Client Registration Endpoint) 활성화
+- `AuthorizationRepositoryConfig`가 `RegisteredClient`(bff-client)와 토큰 TTL(Access 10분/Refresh 1일)을 설정
+- `KeyConfig`는 `commonLib`의 `Jwk.generateRsa()`로 RSA 키쌍을 생성하고 ID Token claims(`id`, `loginId`, `role` 등)을 커스터마이즈
+- `RedisOAuth2AuthorizationService` + `AuthRedisCustomizer` + `TokenBlacklistService`로 Authorization Code/Token/ID Token 상태를 Redis TTL 기반으로 관리하고 로그아웃 시 블랙리스트 처리
+- `SignupController` + `login.html`/`signup.html`로 로컬 가입과 소셜 2차 가입을 지원하며 `SignupService`가 비밀번호 인코딩/Role 부여 처리
+- `OAuth2LoginSuccessHandler`는 신규 소셜 사용자를 `/signup?social=true`로 리다이렉트, 기존 사용자는 저장된 Authorization Request로 복귀시킵니다.
+- `AppProperties`에서 base URL/포트를 한 번에 관리하여 Redirect URI, Signup URL, Gateway Callback URL을 재사용
 
-### 4. **eurekaServer** (Service Discovery) - 포트 8761
-- **역할**: 마이크로서비스 등록 및 발견
-- **주요 기능**:
-  - 서비스 인스턴스 등록
-  - 서비스 상태 모니터링
-  - 로드 밸런싱 지원
-  - Eureka 대시보드 제공
+### web-bff-server (`web-bff-server/`)
+- `AuthController`가 `/api/auth/login|callback|status|user/me|logout` REST 엔드포인트 제공, `CookieUtil`이 Access/Refresh 토큰을 HttpOnly + SameSite=Lax 쿠키로 저장
+- `TokenService`는 WebClient로 `/oauth2/token` 교환, `/userinfo` 조회, Refresh Grant를 수행하고, `JwtAuthEntryPoint`는 만료 시 Refresh가 성공하면 `449 Retry With`를 내려 SPA 재시도를 유도
+- `SecurityConfig`는 Resource Server 모드에서 Auth Server `/.well-known/jwks.json`을 사용하여 JWT를 검증하고, 필요 시 `JwtFromCookieFilter`를 활성화해 Authorization 헤더를 자동 주입 가능
+- `AppProperties`는 Auth/BFF/Frontend URL 계산을 캡슐화해 리다이렉트 및 WebClient 호출의 오타를 방지
 
-### 5. **commonLib** (공통 라이브러리)
-- **역할**: 공통 상수 및 유틸리티
-- **주요 기능**:
-  - 에러 코드 정의
-  - 로그인 결과 상수
-  - HTTP 상태 코드 커스텀
-  - JWT JWK 유틸리티
+### apiGateway (`apiGateway/`)
+- Spring Cloud Gateway로 `/api/auth/**` 라우팅 예제가 포함되어 있으며, `globalcors`에서 로컬 개발 도메인을 화이트리스트 처리
+- `application.yml`에 `JWT_SECRET`, `INTERNAL_TOKEN`, `permit-all-paths` 등을 외부 환경 변수로 넘길 수 있도록 설계되어 추가 라우팅/보안 정책을 쉽게 확장 가능
+- Eureka Client로 등록되어 Backend 서비스와 동적으로 연결
 
-### 6. **infra** (인프라 라이브러리)
-- **역할**: 공통 인프라 설정 및 유틸리티
-- **주요 기능**:
-  - Redis 설정 (EnableRedisConfig)
-  - WebClient 설정 (EnableWebConfig)
-  - ObjectMapper 설정 (EnableObjMapperConfig)
-  - ModelMapper 설정 (EnableModelMapperConfig)
-  - PasswordEncoder 설정 (EnablePasswordEncoderConfig)
-  - 재사용 가능한 인프라 구성 요소
+### eurekaServer (`eurekaServer/`)
+- `EurekaServerApplication` 하나로 구성되며 `register-with-eureka: false` 설정으로 독립 실행, 8761 포트에서 대시보드를 제공
 
-## 🚀 기술 스택
+### commonLib (`commonLib/`)
+- `ErrorCode`, `LoginResult`, `CustomHttpStatus`, `Jwk` 등 모든 서비스에서 사용되는 상수/HTTP 상태/키 유틸을 제공
 
-### Backend
-- **Spring Boot 3.3.5**
-- **Spring Cloud 2023.0.3**
-- **Spring Security OAuth2**
-  - OAuth2 Authorization Server
-  - OAuth2 Client
-  - OAuth2 Resource Server
-- **Spring Cloud Gateway** (API Gateway)
-- **Spring Cloud Netflix Eureka** (Service Discovery)
-- **Redis** (Authorization 상태 저장 및 세션 관리)
-- **MySQL** (사용자 데이터)
-- **JWT** (토큰 기반 인증)
-- **Thymeleaf** (로그인 페이지 템플릿)
+### infra (`infra/`)
+- `ObjectMapperConfig`(snake_case + JavaTime), `RedisConfig`(GenericJackson2JsonRedisSerializer), `WebClientConfig`, `ModelMapperConfig`, `PasswordEncoderConfig`를 Bean으로 정의
+- `@EnableRedisConfig`, `@EnableWebConfig`, `@EnableObjMapperConfig`, `@EnableModelMapperConfig`, `@EnablePasswordEncoderConfig`로 필요한 모듈에서 명시적으로 활성화
 
-### Frontend 지원
-- **CORS** 설정으로 React/Vue 등 SPA 지원
-- **HttpOnly 쿠키** 기반 세션 관리
-- **JWT 토큰** 자동 검증
+## 인증 흐름
 
-## 🔐 인증 플로우
-
-### 1. 로그인 플로우
+### 로그인
 ```mermaid
 sequenceDiagram
     participant SPA as Frontend (SPA)
-    participant BFF as Web BFF Server
-    participant AS as Auth Server
-    participant Google as Google/Kakao OAuth
-
-    SPA->>BFF: 1. 로그인 요청 (GET /api/auth/login)
-    BFF->>AS: 2. OAuth2 Authorization Request
-    AS->>Google: 3. 소셜 로그인 페이지 리다이렉트
-    Google->>AS: 4. Authorization Code 반환
-    AS->>BFF: 5. Authorization Code 전달 (callback)
-    BFF->>AS: 6. Token Exchange Request (POST /oauth2/token)
-    AS->>BFF: 7. Access Token + Refresh Token (JWT)
-    BFF->>BFF: 8. 토큰을 HttpOnly 쿠키에 저장
-    BFF->>SPA: 9. 성공 리다이렉트 (?login=SUCCESS)
+    participant BFF as Web BFF (9091)
+    participant AS as Auth Server (9090)
+    participant IdP as Google/Kakao
+    SPA->>BFF: GET /api/auth/login
+    BFF-->>SPA: OAuth2 Authorize URL (redirect)
+    SPA->>AS: /oauth2/authorize
+    AS->>IdP: 소셜 로그인 위임
+    IdP->>AS: Authorization Code
+    AS->>BFF: redirect /api/auth/callback?code=...
+    BFF->>AS: POST /oauth2/token
+    AS->>BFF: Access/Refresh/ID Token
+    BFF->>BFF: HttpOnly 쿠키 저장
+    BFF-->>SPA: ?login=success 리다이렉트
 ```
 
-### 2. API 호출 플로우
+### 보호 API 호출
 ```mermaid
 sequenceDiagram
-    participant SPA as Frontend (SPA)
-    participant BFF as Web BFF Server
-    participant AG as API Gateway
-    participant Eureka as Eureka Server
-    participant API as Backend Service
-
-    SPA->>BFF: 1. API 요청 (쿠키 포함)
-    BFF->>BFF: 2. JWT 토큰 검증 (JWK URI)
-    BFF->>AG: 3. API 요청 + Access Token
-    AG->>Eureka: 4. 서비스 조회
-    Eureka->>AG: 5. 서비스 정보 반환
-    AG->>API: 6. 라우팅된 API 요청
-    API->>AG: 7. 응답 데이터
-    AG->>BFF: 8. 응답 전달
-    BFF->>SPA: 9. 최종 응답
+    participant SPA
+    participant BFF
+    participant GW as API Gateway (8080)
+    participant EU as Eureka
+    participant BE as Backend Service
+    SPA->>BFF: API 요청 (쿠키 포함)
+    BFF->>BFF: JWT 검증, 필요 시 Refresh
+    BFF->>GW: Authorization: Bearer <token>
+    GW->>EU: 서비스 조회
+    EU-->>GW: 인스턴스 정보
+    GW->>BE: 라우팅된 요청
+    BE-->>GW: 응답
+    GW-->>BFF: 응답 전달
+    BFF-->>SPA: 최종 응답
 ```
 
-## 🛠️ 설치 및 실행
+## 디렉터리 맵
+```
+spring-msa-boilerplate/
+├── authServer/
+│   ├── config/ (AuthorizationServerConfig, KeyConfig, AppProperties…)
+│   ├── controller/ (LoginController, SignupController)
+│   ├── handler/, redis/, service/, repository/, entity/, dto/
+│   └── resources/templates/login|signup.html
+├── web-bff-server/
+│   ├── controller/AuthController.java
+│   ├── service/TokenService.java
+│   ├── security/(JwtAuthEntryPoint, JwtFromCookieFilter)
+│   └── utils/CookieUtil.java
+├── apiGateway/
+│   └── src/main/resources/application.yml
+├── eurekaServer/
+├── commonLib/
+├── infra/
+├── docker-compose.yml (Redis)
+├── build.gradle / settings.gradle
+└── README.md
+```
 
-### 1. 사전 요구사항
-- Java 17+
-- Redis
-- MySQL (선택사항, 사용자 데이터 저장용)
+## 개발 환경 준비
 
-### 2. 환경 변수 설정
+### 필수 요구사항
+- Java 17 이상
+- Redis 7.x (또는 호환 버전) – `docker-compose up -d`
+- MySQL 8.x (또는 호환 DB) – 사용자 정보 저장
+- Gradle Wrapper, Git, cURL, Docker Desktop/Colima
+- (선택) React/Vue 등 SPA 클라이언트 3000번 포트
 
-각 서비스 실행 전에 다음 환경 변수를 설정해야 합니다:
+### 환경 변수
 
+| 변수 | 설명 | 사용 서비스 |
+| --- | --- | --- |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_SECRET_ID` | Google OAuth 클라이언트 정보 | authServer |
+| `KAKAO_REST_API_KEY`, `KAKAO_CLIENT_SECRET` | Kakao OAuth 클라이언트 정보 | authServer |
+| `TEST_DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | 사용자 DB 접속 정보 | authServer |
+| `JWT_SECRET` | Gateway/백엔드에서 사용하는 대칭키 | apiGateway |
+| `INTERNAL_TOKEN` | 내부 호출/예시 보안 토큰 | apiGateway |
+
+Linux/macOS:
 ```bash
-# Auth Server 환경 변수
-export GOOGLE_CLIENT_ID="your-google-client-id"
-export GOOGLE_SECRET_ID="your-google-secret"
-export KAKAO_REST_API_KEY="your-kakao-api-key"
-export KAKAO_CLIENT_SECRET="your-kakao-secret"
-export TEST_DB_URL="jdbc:mysql://localhost:3306/testdb"
-export DB_USERNAME="your-db-username"
-export DB_PASSWORD="your-db-password"
-
-# API Gateway 환경 변수
-export JWT_SECRET="your-jwt-secret"
-export INTERNAL_TOKEN="your-internal-token"
+export GOOGLE_CLIENT_ID=your-google-client-id
+export GOOGLE_SECRET_ID=your-google-secret
+# ...
+export INTERNAL_TOKEN=your-internal-token
 ```
 
-Windows 환경에서는:
+Windows(cmd):
 ```cmd
 set GOOGLE_CLIENT_ID=your-google-client-id
 set GOOGLE_SECRET_ID=your-google-secret
-set KAKAO_REST_API_KEY=your-kakao-api-key
-set KAKAO_CLIENT_SECRET=your-kakao-secret
-set TEST_DB_URL=jdbc:mysql://localhost:3306/testdb
-set DB_USERNAME=your-db-username
-set DB_PASSWORD=your-db-password
-set JWT_SECRET=your-jwt-secret
+:: ...
 set INTERNAL_TOKEN=your-internal-token
 ```
 
-### 3. Redis 실행
+## 실행 방법
+
+1. **Redis 기동**
+   ```bash
+   docker-compose up -d
+   ```
+2. **전체 빌드**
+   ```bash
+   ./gradlew clean build
+   ```
+3. **서비스 순서**
+   ```bash
+   ./gradlew :eurekaServer:bootRun
+   ./gradlew :authServer:bootRun
+   ./gradlew :web-bff-server:bootRun
+   ./gradlew :apiGateway:bootRun
+   ```
+   Windows는 `gradlew.bat` 사용. 포트는 각 `application.yml`에서 조정 가능.
+4. **JAR 실행**
+   ```bash
+   java -jar eurekaServer/build/libs/eurekaServer-0.0.1-SNAPSHOT.jar
+   # ...
+   ```
+5. **Health 확인**
+    - `http://localhost:8761` (Eureka Dashboard)
+    - `http://localhost:9090/actuator/health`
+    - `http://localhost:8080/actuator/health`
+
+## API & 유틸 엔드포인트
+
+| 서비스 | 엔드포인트 |
+| --- | --- |
+| Web BFF 9091 | `GET /api/auth/login`, `GET /api/auth/callback`, `GET /api/auth/status`, `GET /api/auth/user/me`, `POST /api/auth/logout` |
+| Auth Server 9090 | `GET /oauth2/authorize`, `POST /oauth2/token`, `POST /oauth2/revoke`, `GET /userinfo`, `GET /.well-known/jwks.json`, `GET /login`, `GET/POST /signup` |
+| API Gateway 8080 | `GET /api/auth/**` (예시 라우팅), 추가 라우트는 `application.yml` 수정 |
+| Eureka 8761 | `GET /` (대시보드) |
+| Actuator | 각 서비스 `/actuator/**` (필요 시 yml에서 노출) |
+
+## 공통 인프라 & 보안 포인트
+- **RedisOAuth2AuthorizationService**: Authorization Code/Access/Refresh/ID Token을 Redis TTL + 인덱스로 저장하여 수평 확장 대비
+- **TokenBlacklistService**: 로그아웃 시 Access Token을 남은 TTL 동안 블랙리스트로 유지
+- **JwtAuthEntryPoint**: JWT 만료 → Refresh 성공 시 `449 Retry With` 응답으로 프런트 재시도를 유도
+- **CookieUtil**: HttpOnly + SameSite + Secure 플래그를 일원화, 프로덕션에서는 `secure=true`, `SameSite=None` 권장
+- **CorsConfig / SecurityConfig**: 프런트/브라우저 리다이렉트 시 필요한 오리진만 허용
+- **AppProperties**: Redirect URI, Signup URL 등 모든 경로 계산을 중앙화
+- **Infra 애노테이션**: `@EnableRedisConfig` 등으로 공통 Bean을 명시적으로 포함해 클래스패스 의존을 줄임
+- **CustomRequestCache**: OAuth Authorization 요청 외 정적 요청(DevTools 등)을 저장하지 않도록 필터링
+
+## 테스트 & 검증
+
 ```bash
-# Docker로 Redis 실행
-docker-compose up -d redis
+./gradlew test
 
-# 또는 직접 실행
-redis-server
+curl -i http://localhost:9091/api/auth/status
+
+curl -i --cookie "ACCESS_TOKEN=<token>" http://localhost:9091/api/auth/user/me
 ```
 
-### 4. 서비스 실행 순서
+- 소셜 로그인 후 `/signup?social=true` 화면에서 추가 정보 입력 시 MySQL `users` 테이블에 레코드가 생성되는지 확인
+- Redis CLI에서 `keys oauth2:*`로 Authorization/Token/Blacklist 키를 확인 가능
 
-**Gradle Multi-Project 빌드:**
+## 배포 & 운영 팁
+- 프로덕션에서는 HTTPS 적용 + `CookieUtil` `secure=true`, `SameSite=None` 설정 필수
+- Redis는 AOF/Sentinel/Cluster 구성 권장 (`docker-compose`는 단일 노드)
+- Auth Server RSA 키를 외부 KMS/키스토어에서 주입하려면 `KeyConfig`를 확장하면 됨
+- API Gateway에 RateLimit, CircuitBreaker, Auth 헤더 주입 필터 등을 추가해보세요
+- `infra` 모듈을 별도 패키지로 추출해 다른 프로젝트에서도 재사용 가능
 
-```bash
-# 루트에서 모든 프로젝트 빌드
-./gradlew build
+## 향후 확장 아이디어
+- Config Server / 중앙 환경 설정
+- Backend 서비스 예제(주문/상품) + Gateway 라우팅 코드
+- 다중 OAuth2 클라이언트, PKCE, Device Flow 등 추가 플로우
+- Web BFF에서 SSE/WebSocket/GraphQL 프록시 패턴 실험
+- Observability (Prometheus, Zipkin, Grafana) 연동
 
-# 각 서비스 실행 (새 터미널에서)
-# 1. Eureka Server 시작
-cd eurekaServer
-./gradlew bootRun
+## 기여하기
+1. Fork
+2. `git checkout -b feature/my-feature`
+3. `./gradlew test`
+4. `git commit -m "Add my feature"`
+5. PR 생성
 
-# 2. Auth Server 시작 (새 터미널)
-cd authServer
-./gradlew bootRun
+## 라이선스
+MIT License – `LICENSE` 참고.
 
-# 3. Web BFF Server 시작 (새 터미널)
-cd web-bff-server
-./gradlew bootRun
-
-# 4. API Gateway 시작 (새 터미널)
-cd apiGateway
-./gradlew bootRun
-```
-
-**Windows 환경:**
-```cmd
-gradlew.bat build
-
-cd eurekaServer
-gradlew.bat bootRun
-
-cd ..\authServer
-gradlew.bat bootRun
-
-cd ..\web-bff-server
-gradlew.bat bootRun
-
-cd ..\apiGateway
-gradlew.bat bootRun
-```
-
-## 📋 API 엔드포인트
-
-### Web BFF Server (BFF) - 포트 9091
-```
-GET  /api/auth/login          # 로그인 시작 (OAuth2 인증 서버로 리다이렉트)
-GET  /api/auth/callback       # OAuth2 콜백 (Authorization Code 수신)
-GET  /api/auth/status         # 로그인 상태 확인
-GET  /api/auth/user/me        # 사용자 정보 조회
-POST /api/auth/logout         # 로그아웃 (토큰 폐기)
-```
-
-### Auth Server (OAuth2 Authorization Server) - 포트 9090
-```
-GET  /oauth2/authorize        # OAuth2 인증 요청
-POST /oauth2/token            # 토큰 발급 (Authorization Code 교환)
-POST /oauth2/revoke           # 토큰 폐기 (RFC 7009)
-GET  /userinfo                # 사용자 정보 (OIDC)
-GET  /login                   # 로그인 페이지 (Thymeleaf)
-GET  /.well-known/jwks.json   # JWT 공개키 (JWK Set)
-```
-
-### API Gateway - 포트 8080
-```
-GET  /api/auth/**             # 인증 관련 라우팅 (authServer로 전달)
-```
-
-### Eureka Server - 포트 8761
-```
-GET  /                        # Eureka 대시보드
-```
-
-## 🔧 설정 파일
-
-### Web BFF Server 설정 (application.yml)
-```yaml
-spring:
-  application:
-    name: web-bff-server
-  web:
-    cors:
-      allowed-origins: "http://localhost:3000"
-      allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
-      allowed-headers: "*"
-      allow-credentials: true
-  security:
-    oauth2:
-      client:
-        registration:
-          auth-server:
-            client-id: bff-client
-            client-secret: bff-secret
-            authorization-grant-type: authorization_code
-            redirect-uri: http://localhost:9091/api/auth/callback
-            scope: openid,profile,email
-        provider:
-          auth-server:
-            authorization-uri: http://localhost:9090/oauth2/authorize
-            token-uri: http://localhost:9090/oauth2/token
-            user-info-uri: http://localhost:9090/userinfo
-            jwk-set-uri: http://localhost:9090/.well-known/jwks.json
-
-server:
-  port: 9091
-
-app:
-  base-url: http://localhost
-  ports:
-    auth-server: 9090
-    frontend: 3000
-    auth-gateway: 9091
-```
-
-### Auth Server 설정 (application.yml)
-```yaml
-spring:
-  application:
-    name: auth-server
-  data:
-    redis:
-      host: localhost
-      port: 6379
-  security:
-    oauth2:
-      authorization-server:
-        issuer: http://localhost:9090
-      client:
-        registration:
-          google:
-            client-id: ${GOOGLE_CLIENT_ID}
-            client-secret: ${GOOGLE_SECRET_ID}
-            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
-            authorization-grant-type: authorization_code
-            scope: openid,email,profile
-          kakao:
-            client-id: ${KAKAO_REST_API_KEY}
-            client-secret: ${KAKAO_CLIENT_SECRET}
-            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
-            authorization-grant-type: authorization_code
-            client-authentication-method: client_secret_post
-            scope: profile_nickname,profile_image
-
-server:
-  port: 9090
-
-app:
-  base-url: http://localhost
-  ports:
-    auth-server: 9090
-    frontend: 3000
-    auth-gateway: 9091
-```
-
-### API Gateway 설정 (application.yml)
-```yaml
-spring:
-  application:
-    name: apiGateway
-  cloud:
-    gateway:
-      routes:
-        - id: authServer
-          uri: lb://authService
-          predicates:
-            - Path=/api/auth/**
-          filters:
-            - StripPrefix=0
-
-server:
-  port: 8080
-
-eureka:
-  client:
-    serviceUrl:
-      defaultZone: "http://localhost:8761/eureka/"
-```
-
-## 🧪 테스트
-
-### 1. 로그인 테스트
-```bash
-# 브라우저에서 접속
-http://localhost:9091/api/auth/login
-```
-
-### 2. API 테스트
-```bash
-# 상태 확인
-curl -X GET http://localhost:9091/api/auth/status
-
-# 사용자 정보 조회 (쿠키 필요)
-curl -X GET http://localhost:9091/api/auth/user/me \
-  --cookie "ACCESS_TOKEN=your-access-token"
-
-# 로그아웃
-curl -X POST http://localhost:9091/api/auth/logout \
-  --cookie "REFRESH_TOKEN=your-refresh-token"
-```
-
-### 3. Eureka 대시보드 확인
-```
-http://localhost:8761
-```
-
-## 🔒 보안 특징
-
-### 1. 토큰 관리
-- **Access Token**: JWT 형식, Auth Server에서 발급
-- **Refresh Token**: 토큰 갱신용
-- **HttpOnly 쿠키**: XSS 공격 방지
-- **자동 갱신**: Access Token 만료 시 자동 갱신 (구현 예정)
-
-### 2. 세션 보안
-- **HttpOnly 쿠키**: JavaScript 접근 불가
-- **쿠키 기반 인증**: SPA에서 토큰 직접 관리 불필요
-- **CORS 설정**: 허용된 도메인만 접근 가능
-- **JWT 검증**: Resource Server를 통한 토큰 검증
-
-### 3. OAuth2 표준 준수
-- **Authorization Code Flow**: 가장 안전한 OAuth2 플로우
-- **OIDC 지원**: 사용자 인증 및 식별
-- **JWT 토큰**: 무상태 인증 지원
-- **JWK Set**: 공개키 기반 토큰 검증
-
-## 📁 프로젝트 구조
-
-```
-spring-msa-boilerplate/
-├── authServer/              # OAuth2 Authorization Server
-│   ├── src/main/java/com/example/authserver/
-│   │   ├── config/         # 보안 및 OAuth2 설정
-│   │   ├── controller/     # 로그인 컨트롤러
-│   │   ├── handler/        # 인증 성공 핸들러
-│   │   ├── service/        # OIDC 사용자 서비스
-│   │   ├── dto/           # 데이터 전송 객체
-│   │   └── entity/        # 엔티티
-│   └── src/main/resources/
-│       ├── application.yml # 서버 설정
-│       └── templates/      # 로그인 페이지 (Thymeleaf)
-├── web-bff-server/         # BFF 서버
-│   ├── src/main/java/com/example/webbffserver/
-│   │   ├── config/         # 보안 설정
-│   │   ├── controller/     # 인증 컨트롤러
-│   │   ├── service/        # 토큰 관리 서비스
-│   │   ├── security/       # JWT 필터 및 인증 처리
-│   │   ├── dto/           # 응답 DTO
-│   │   └── utils/         # 유틸리티
-│   └── src/main/resources/
-│       └── application.yml # BFF 설정
-├── apiGateway/             # API Gateway
-│   ├── src/main/java/com/example/apigateway/
-│   └── src/main/resources/
-│       └── application.yml # Gateway 설정
-├── eurekaServer/           # Service Discovery
-│   ├── src/main/java/com/example/eurekaserver/
-│   └── src/main/resources/
-│       └── application.yml # Eureka 설정
-├── commonLib/              # 공통 라이브러리
-│   └── src/main/java/com/example/
-│       ├── constants/      # 에러 코드, 상수
-│       ├── http/          # HTTP 유틸리티
-│       └── util/          # 공통 유틸리티
-├── infra/                  # 인프라 라이브러리
-│   └── src/main/java/com/example/infra/
-│       ├── annotation/     # 활성화 애노테이션
-│       └── config/        # 인프라 설정 (Redis, WebClient 등)
-├── docker-compose.yml      # Redis 컨테이너
-├── build.gradle           # 루트 빌드 설정
-├── settings.gradle        # 모듈 설정
-└── README.md              # 프로젝트 문서
-```
-
-## 🚀 배포
-
-### Docker 배포
-```bash
-# Redis 실행
-docker-compose up -d
-
-# 각 서비스 빌드
-./gradlew build
-
-# JAR 파일 실행
-java -jar eurekaServer/build/libs/eurekaServer-0.0.1-SNAPSHOT.jar
-java -jar authServer/build/libs/authServer-0.0.1-SNAPSHOT.jar
-java -jar web-bff-server/build/libs/web-bff-server-0.0.1-SNAPSHOT.jar
-java -jar apiGateway/build/libs/apiGateway-0.0.1-SNAPSHOT.jar
-```
-
-### 프로덕션 환경 설정
-- 환경 변수를 운영 환경에 맞게 설정
-- HTTPS 적용 (쿠키 Secure 플래그)
-- 데이터베이스 연결 풀 최적화
-- Redis 클러스터 구성 (고가용성)
-- 로그 레벨 조정
-
-## 🤝 기여하기
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📄 라이선스
-
-이 프로젝트는 MIT 라이선스 하에 배포됩니다. 자세한 내용은 `LICENSE` 파일을 참조하세요.
-
-## 📞 문의
-
-프로젝트에 대한 문의사항이 있으시면 이슈를 생성해 주세요.
-
----
-
-**주요 특징**:
-- ✅ OAuth2 표준 준수
-- ✅ OIDC (OpenID Connect) 지원
-- ✅ BFF 패턴 구현
-- ✅ JWT 토큰 기반 인증
-- ✅ HttpOnly 쿠키 기반 보안
-- ✅ 소셜 로그인 지원 (Google, Kakao)
-- ✅ 마이크로서비스 아키텍처
-- ✅ 서비스 디스커버리 (Eureka)
-- ✅ API Gateway 패턴
-- ✅ Redis 기반 상태 관리
-- ✅ 모듈화된 공통 라이브러리 (commonLib, infra)
+## 문의
+이슈 트래커에서 버그/질문/제안사항을 남겨주세요.
+ 
