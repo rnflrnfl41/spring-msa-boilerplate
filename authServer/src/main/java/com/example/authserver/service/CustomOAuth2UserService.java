@@ -1,5 +1,11 @@
 package com.example.authserver.service;
 
+import com.example.authserver.entity.CustomUserDetails;
+import com.example.authserver.entity.UserInfo;
+import com.example.authserver.handler.info.OAuth2UserInfo;
+import com.example.authserver.handler.info.OAuth2UserInfoFactory;
+import com.example.authserver.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
@@ -18,44 +24,28 @@ import java.util.Map;
  * 3️⃣ Kakao 등 일반 OAuth2 Provider용
  * id, nickname, profile_image 매핑
  */
-@Component
 @Slf4j
+@Component
+@RequiredArgsConstructor
 public class CustomOAuth2UserService extends DefaultOAuth2UserService {
+
+    private final UserRepository userRepository;
 
     @Override
     public OAuth2User loadUser(OAuth2UserRequest userRequest)
             throws OAuth2AuthenticationException {
 
-        OAuth2User oauth2User = super.loadUser(userRequest);
+        OAuth2User oAuth2User = super.loadUser(userRequest);
 
-        if ("kakao".equals(userRequest.getClientRegistration().getRegistrationId())) {
-            return processKakaoUser(oauth2User);
-        }
+        String provider = userRequest.getClientRegistration().getRegistrationId();
+        OAuth2UserInfo userInfo = OAuth2UserInfoFactory.of(provider, oAuth2User.getAttributes());
 
-        return oauth2User;
-    }
+        // 1) 소셜 계정 DB 조회
+        UserInfo user = userRepository
+                .findByEmailAndProviderAndProviderId(userInfo.getEmail(),provider, userInfo.getId())
+                .orElseThrow(() -> new OAuth2AuthenticationException("소셜 계정을 찾을 수 없음"));
 
-    @SuppressWarnings("unchecked")
-    private OAuth2User processKakaoUser(OAuth2User oauth2User) {
-        Map<String, Object> attributes = oauth2User.getAttributes();
-        Map<String, Object> kakaoAccount = (Map<String, Object>) attributes.get("kakao_account");
-        Map<String, Object> profile = (Map<String, Object>) kakaoAccount.get("profile");
-
-        // 카카오 정보를 표준화
-        Map<String, Object> standardAttributes = new HashMap<>();
-        Object idValue = attributes.get("id");
-        standardAttributes.put("id", idValue != null ? String.valueOf(idValue) : null);
-        standardAttributes.put("sub", idValue != null ? String.valueOf(idValue) : null);
-
-        standardAttributes.put("name", profile.get("nickname"));
-        standardAttributes.put("picture", profile.get("profile_image_url"));
-
-        standardAttributes.put("kakao_account", kakaoAccount);
-
-        return new DefaultOAuth2User(
-                List.of(new SimpleGrantedAuthority("OAUTH2_USER")),
-                standardAttributes,
-                "sub"
-        );
+        // 2) CustomUserDetails 로 래핑
+        return new CustomUserDetails(user, oAuth2User.getAttributes());
     }
 }
