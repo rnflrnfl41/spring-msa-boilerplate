@@ -8,16 +8,15 @@ import lombok.NoArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 
 import java.io.Serial;
 import java.io.Serializable;
-import java.util.Collection;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Getter
 @NoArgsConstructor
-public class CustomUserDetails implements UserDetails, Serializable {
+public class CustomUserDetails implements UserDetails, OAuth2User, Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
@@ -30,27 +29,11 @@ public class CustomUserDetails implements UserDetails, Serializable {
     private String password;
     private Role role;
 
-    // ✅ Jackson 역직렬화용 생성자
-    @JsonCreator
-    public CustomUserDetails(
-            @JsonProperty("id") UUID id,
-            @JsonProperty("loginId") String loginId,
-            @JsonProperty("username") String username,
-            @JsonProperty("email") String email,
-            @JsonProperty("phone") String phone,
-            @JsonProperty("password") String password,
-            @JsonProperty("role") Role role
-    ) {
-        this.id = id;
-        this.loginId = loginId;
-        this.username = username;
-        this.email = email;
-        this.phone = phone;
-        this.password = password;
-        this.role = role;
-    }
+    private Map<String, Object> attributes = Map.of(); // OAuth2User attributes
 
-    // ✅ 기존 DB 객체로부터 생성자
+    private List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+
+    // DB 기반 생성자
     public CustomUserDetails(UserInfo user) {
         this.id = user.getId();
         this.loginId = user.getLoginId();
@@ -59,25 +42,33 @@ public class CustomUserDetails implements UserDetails, Serializable {
         this.phone = user.getPhone();
         this.password = user.getPassword();
         this.role = user.getRole();
+
+        this.authorities = List.of(new SimpleGrantedAuthority(role.name()));
     }
 
-    @JsonIgnore
+    // OAuth2User용 생성자
+    public CustomUserDetails(UserInfo user, Map<String, Object> attributes) {
+        this(user);
+        this.attributes = attributes;
+    }
+
+    @Override
+    public Map<String, Object> getAttributes() {
+        return attributes;
+    }
+
+    @Override
+    public String getName() {
+        return loginId != null ? loginId : id.toString();
+    }
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // ROLE Enum의 name() 사용, ROLE_ prefix 자동 추가
-        return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
+        return authorities;
     }
 
-    @Override public boolean isAccountNonExpired() {
-        return UserDetails.super.isAccountNonExpired();
-    }
-    @Override public boolean isAccountNonLocked() {
-        return UserDetails.super.isAccountNonLocked();
-    }
-    @Override public boolean isCredentialsNonExpired() {
-        return UserDetails.super.isCredentialsNonExpired();
-    }
-    @Override public boolean isEnabled() {
-        return UserDetails.super.isEnabled();
-    }
+    @Override public boolean isAccountNonExpired() { return true; }
+    @Override public boolean isAccountNonLocked() { return true; }
+    @Override public boolean isCredentialsNonExpired() { return true; }
+    @Override public boolean isEnabled() { return true; }
 }

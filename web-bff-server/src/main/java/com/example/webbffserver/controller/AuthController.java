@@ -52,7 +52,7 @@ public class AuthController {
             // 1️⃣ 에러 체크
             if (error != null) {
                 log.error("❌ OAuth2 에러: {}", error);
-                response.sendRedirect(buildFrontendRedirectUrl(LoginResult.FAILED,error));
+                response.sendRedirect(buildFrontendRedirectUrl(LoginResult.FAILED, error));
                 return;
             }
 

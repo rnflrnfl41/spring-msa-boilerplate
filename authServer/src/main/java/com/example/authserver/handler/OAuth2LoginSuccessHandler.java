@@ -1,6 +1,7 @@
 package com.example.authserver.handler;
 
 import com.example.authserver.config.CustomRequestCache;
+import com.example.authserver.entity.CustomUserDetails;
 import com.example.authserver.entity.UserInfo;
 import com.example.authserver.handler.info.OAuth2UserInfo;
 import com.example.authserver.handler.info.OAuth2UserInfoFactory;
@@ -11,7 +12,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.security.web.savedrequest.SavedRequest;
@@ -36,8 +39,9 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         OAuth2AuthenticationToken oauthToken = (OAuth2AuthenticationToken) authentication;
         String provider = oauthToken.getAuthorizedClientRegistrationId(); // google, kakao ...
 
-        Map<String, Object> attributes = oauthToken.getPrincipal().getAttributes();
-        OAuth2UserInfo userInfo = OAuth2UserInfoFactory.of(provider, attributes);
+        OAuth2UserInfo userInfo =
+                OAuth2UserInfoFactory.of(oauthToken.getAuthorizedClientRegistrationId(),
+                        oauthToken.getPrincipal().getAttributes());
 
         // ✅ 사용자 정보 추출
         String email = userInfo.getEmail();
@@ -57,6 +61,26 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
             getRedirectStrategy().sendRedirect(request, response, signupUrl);
             return;
         }
+
+        UserInfo user = userRepository.findByEmailAndProviderAndProviderId(
+                userInfo.getEmail(),
+                oauthToken.getAuthorizedClientRegistrationId(),
+                userInfo.getId()
+        ).orElseThrow();
+
+        // CustomUserDetails 생성
+        CustomUserDetails customPrincipal = new CustomUserDetails(user, oauthToken.getPrincipal().getAttributes());
+
+        // OAuth2AuthenticationToken → UsernamePasswordAuthenticationToken 로 교체
+        UsernamePasswordAuthenticationToken newAuth =
+                new UsernamePasswordAuthenticationToken(
+                        customPrincipal,
+                        null,
+                        customPrincipal.getAuthorities()
+                );
+
+        // SecurityContext에 저장
+        SecurityContextHolder.getContext().setAuthentication(newAuth);
 
         // ✅ 3️⃣ 기존 회원이면 정상 리다이렉트
         SavedRequest savedRequest = customRequestCache.getRequest(request, response);

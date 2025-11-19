@@ -54,32 +54,4 @@ public class KeyConfig {
                 .build();
     }
 
-    @Bean
-    public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer() {
-        return context -> {
-            // 디버그: 어떤 토큰 타입이 들어오는지 확인
-            String tokenTypeValue = context.getTokenType().getValue();
-            log.debug("🔍 Token Type: {}", tokenTypeValue);
-            log.debug("🔍 OidcParameterNames.ID_TOKEN: {}", OidcParameterNames.ID_TOKEN);
-            log.debug("🔍 비교 결과: {}", tokenTypeValue.equals(OidcParameterNames.ID_TOKEN));
-            
-            // ID Token에만 claims 추가
-            if (tokenTypeValue.equals(OidcParameterNames.ID_TOKEN)) {
-                log.debug("✅ ID Token 처리 시작");
-                Authentication principal = context.getPrincipal();
-                CustomUserDetails user = (CustomUserDetails) principal.getPrincipal();
-
-                context.getClaims().claim("id", user.getId().toString());
-                context.getClaims().claim("loginId", user.getLoginId());
-                context.getClaims().claim("name", user.getUsername());
-                context.getClaims().claim("email", user.getEmail() == null ? "" : user.getEmail());
-                context.getClaims().claim("phone", user.getPhone() == null ? "" : user.getPhone());
-                context.getClaims().claim("role", user.getRole());
-                log.debug("✅ ID Token claims 추가 완료");
-            } else {
-                log.debug("⏭️ ID Token이 아니므로 claims 추가하지 않음: {}", tokenTypeValue);
-            }
-        };
-    }
-
 }
