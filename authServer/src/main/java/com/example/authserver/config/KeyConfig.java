@@ -62,7 +62,7 @@ public class KeyConfig {
             log.debug("🔍 Token Type: {}", tokenTypeValue);
             log.debug("🔍 OidcParameterNames.ID_TOKEN: {}", OidcParameterNames.ID_TOKEN);
             log.debug("🔍 비교 결과: {}", tokenTypeValue.equals(OidcParameterNames.ID_TOKEN));
-            
+
             // ID Token에만 claims 추가
             if (tokenTypeValue.equals(OidcParameterNames.ID_TOKEN)) {
                 log.debug("✅ ID Token 처리 시작");
