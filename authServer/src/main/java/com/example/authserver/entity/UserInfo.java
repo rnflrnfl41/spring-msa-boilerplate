@@ -35,6 +35,8 @@ public class UserInfo {
     @Column(name = "name", length = 50)
     private String name;
 
+    private String profileImg;
+
     private String email;
 
     private String phone;
