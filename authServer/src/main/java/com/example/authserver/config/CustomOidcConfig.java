@@ -10,10 +10,10 @@ import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.oidc.authentication.OidcUserInfoAuthenticationContext;
-import org.springframework.security.oauth2.server.authorization.oidc.authentication.OidcUserInfoAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 
+import java.security.Principal;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
@@ -62,36 +62,46 @@ public class CustomOidcConfig {
     @Bean
     public Function<OidcUserInfoAuthenticationContext, OidcUserInfo> userInfoMapper() {
         return (context) -> {
-            OidcUserInfoAuthenticationToken authentication = context.getAuthentication();
-            Object principal = authentication.getPrincipal();
+            OAuth2Authorization authorization = context.getAuthorization();
 
-            // CustomUserDetails에서 사용자 정보 추출
-            if (principal instanceof Authentication auth && auth.getPrincipal() instanceof CustomUserDetails user) {
-                Map<String, Object> claims = new HashMap<>();
+            // OAuth2Authorization에서 Principal attribute 가져오기
+            if (authorization != null) {
+                Principal principal = authorization.getAttribute(Principal.class.getName());
+                
+                // Principal이 Authentication인 경우
+                if (principal instanceof Authentication auth) {
+                    Object authPrincipal = auth.getPrincipal();
+                    
+                    if (authPrincipal instanceof CustomUserDetails user) {
+                        Map<String, Object> claims = new HashMap<>();
 
-                // 표준 OIDC claims
-                claims.put("sub", user.getId().toString());
-                claims.put("name", user.getUsername() != null ? user.getUsername() : "");
-                claims.put("email", user.getEmail() != null ? user.getEmail() : "");
+                        // 표준 OIDC claims
+                        claims.put("sub", user.getId().toString());
+                        claims.put("name", user.getUsername() != null ? user.getUsername() : "");
+                        claims.put("email", user.getEmail() != null ? user.getEmail() : "");
 
-                // 추가 커스텀 claims
-                claims.put("loginId", user.getLoginId() != null ? user.getLoginId() : "");
-                claims.put("phone", user.getPhone() != null ? user.getPhone() : "");
-                claims.put("role", user.getRole() != null ? user.getRole().name() : "");
+                        // 추가 커스텀 claims
+                        claims.put("loginId", user.getLoginId() != null ? user.getLoginId() : "");
+                        claims.put("phone", user.getPhone() != null ? user.getPhone() : "");
+                        claims.put("role", user.getRole() != null ? user.getRole().name() : "");
+                        claims.put("provider", user.getProvider() != null ? user.getProvider() : "");
+                        claims.put("profileImg", user.getProfileImg() != null ? user.getProfileImg() : "");
 
-                log.debug("✅ /userinfo 응답 생성: {}", claims);
-                return new OidcUserInfo(claims);
+                        log.debug("✅ /userinfo 응답 생성: {}", claims);
+                        return new OidcUserInfo(claims);
+                    }
+                }
             }
 
             // 기본 동작 (fallback) - OAuth2Authorization에서 ID Token의 claims 사용
             try {
-                OAuth2Authorization authorization = context.getAuthorization();
                 if (authorization != null) {
                     OAuth2Authorization.Token<OidcIdToken> idTokenToken = 
                         authorization.getToken(OidcIdToken.class);
                     if (idTokenToken != null) {
                         OidcIdToken idToken = idTokenToken.getToken();
                         if (idToken != null) {
+                            log.debug("✅ /userinfo fallback - ID Token claims 사용");
                             return new OidcUserInfo(idToken.getClaims());
                         }
                     }
@@ -101,6 +111,7 @@ public class CustomOidcConfig {
             }
 
             // 최종 fallback - 빈 claims로 반환
+            log.warn("⚠️ /userinfo - 모든 방법 실패, 빈 claims 반환");
             return new OidcUserInfo(Map.of());
         };
     }
