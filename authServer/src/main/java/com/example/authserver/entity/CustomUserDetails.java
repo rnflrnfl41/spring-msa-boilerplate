@@ -24,10 +24,12 @@ public class CustomUserDetails implements UserDetails, OAuth2User, Serializable 
     private UUID id;
     private String loginId;
     private String username;
+    private String profileImg;
     private String email;
     private String phone;
     private String password;
     private Role role;
+    private String provider;
 
     private Map<String, Object> attributes = Map.of(); // OAuth2User attributes
 
@@ -37,11 +39,13 @@ public class CustomUserDetails implements UserDetails, OAuth2User, Serializable 
     public CustomUserDetails(UserInfo user) {
         this.id = user.getId();
         this.loginId = user.getLoginId();
+        this.profileImg = user.getProfileImg();
         this.username = user.getName();
         this.email = user.getEmail();
         this.phone = user.getPhone();
         this.password = user.getPassword();
         this.role = user.getRole();
+        this.provider = user.getProvider();
 
         this.authorities = List.of(new SimpleGrantedAuthority(role.name()));
     }
