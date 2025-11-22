@@ -5,9 +5,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.core.oidc.OidcIdToken;
+import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
+import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
+import org.springframework.security.oauth2.server.authorization.oidc.authentication.OidcUserInfoAuthenticationContext;
+import org.springframework.security.oauth2.server.authorization.oidc.authentication.OidcUserInfoAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
 
 @Slf4j
 @Configuration
@@ -43,6 +52,56 @@ public class CustomOidcConfig {
             } else {
                 log.debug("⏭️ ID Token이 아니므로 claims 추가하지 않음: {}", tokenTypeValue);
             }
+        };
+    }
+
+    /**
+     * /userinfo 엔드포인트 커스터마이징
+     * principal에서 추가 정보를 가져와서 userinfo 응답에 포함
+     */
+    @Bean
+    public Function<OidcUserInfoAuthenticationContext, OidcUserInfo> userInfoMapper() {
+        return (context) -> {
+            OidcUserInfoAuthenticationToken authentication = context.getAuthentication();
+            Object principal = authentication.getPrincipal();
+
+            // CustomUserDetails에서 사용자 정보 추출
+            if (principal instanceof Authentication auth && auth.getPrincipal() instanceof CustomUserDetails user) {
+                Map<String, Object> claims = new HashMap<>();
+
+                // 표준 OIDC claims
+                claims.put("sub", user.getId().toString());
+                claims.put("name", user.getUsername() != null ? user.getUsername() : "");
+                claims.put("email", user.getEmail() != null ? user.getEmail() : "");
+
+                // 추가 커스텀 claims
+                claims.put("loginId", user.getLoginId() != null ? user.getLoginId() : "");
+                claims.put("phone", user.getPhone() != null ? user.getPhone() : "");
+                claims.put("role", user.getRole() != null ? user.getRole().name() : "");
+
+                log.debug("✅ /userinfo 응답 생성: {}", claims);
+                return new OidcUserInfo(claims);
+            }
+
+            // 기본 동작 (fallback) - OAuth2Authorization에서 ID Token의 claims 사용
+            try {
+                OAuth2Authorization authorization = context.getAuthorization();
+                if (authorization != null) {
+                    OAuth2Authorization.Token<OidcIdToken> idTokenToken = 
+                        authorization.getToken(OidcIdToken.class);
+                    if (idTokenToken != null) {
+                        OidcIdToken idToken = idTokenToken.getToken();
+                        if (idToken != null) {
+                            return new OidcUserInfo(idToken.getClaims());
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("⚠️ ID Token claims를 가져오는 중 오류 발생: {}", e.getMessage());
+            }
+
+            // 최종 fallback - 빈 claims로 반환
+            return new OidcUserInfo(Map.of());
         };
     }
 

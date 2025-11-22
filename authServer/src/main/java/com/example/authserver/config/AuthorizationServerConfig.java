@@ -1,5 +1,6 @@
 package com.example.authserver.config;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -12,7 +13,10 @@ import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 @Order(1)
+@RequiredArgsConstructor
 public class AuthorizationServerConfig {
+
+    private final CustomOidcConfig customOidcConfig;
 
     // ========================================
     // OAuth2 Authorization Server 필터 체인
@@ -35,6 +39,9 @@ public class AuthorizationServerConfig {
         http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
                 .oidc(oidc -> oidc
                         .clientRegistrationEndpoint(Customizer.withDefaults())
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userInfoMapper(customOidcConfig.userInfoMapper())
+                        )
                 );
 
         http.oauth2ResourceServer(oauth2 -> oauth2
