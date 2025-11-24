@@ -153,4 +153,14 @@ public class TokenService {
         }
     }
 
+    public JWTClaimsSet parseToken(String token) {
+        try {
+            JWT jwt = JWTParser.parse(token);
+            return jwt.getJWTClaimsSet();
+        } catch (Exception e) {
+            log.error("❌ 토큰 파싱 실패: {}", e.getMessage());
+            return null;
+        }
+    }
+
 }
