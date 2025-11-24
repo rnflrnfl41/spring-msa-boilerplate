@@ -35,10 +35,13 @@ public class UserInfo {
     @Column(name = "name", length = 50)
     private String name;
 
+    @Column(name = "profile_img")
     private String profileImg;
 
+    @Column(name = "email")
     private String email;
 
+    @Column(name = "phone")
     private String phone;
 
     @Column(name = "provider", length = 50)
