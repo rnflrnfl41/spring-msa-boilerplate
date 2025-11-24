@@ -8,14 +8,17 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.oidc.authentication.OidcUserInfoAuthenticationContext;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 
 import java.security.Principal;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 
 @Slf4j
@@ -84,8 +87,20 @@ public class CustomOidcConfig {
                         claims.put("loginId", user.getLoginId() != null ? user.getLoginId() : "");
                         claims.put("phone", user.getPhone() != null ? user.getPhone() : "");
                         claims.put("role", user.getRole() != null ? user.getRole().name() : "");
-                        claims.put("provider", user.getProvider() != null ? user.getProvider() : "");
+                        claims.put("provider", user.getProvider() != null ? user.getProvider() : "일반 로그인");
                         claims.put("profileImg", user.getProfileImg() != null ? user.getProfileImg() : "");
+
+                        OAuth2Authorization.Token<?> accessToken = authorization.getAccessToken();
+                        OAuth2Authorization.Token<?> refreshToken = authorization.getRefreshToken();
+                        if (accessToken != null) {
+                            Date exp = Date.from(Objects.requireNonNull(accessToken.getToken().getExpiresAt()));
+                            claims.put("accessExp", exp.getTime());
+                        }
+
+                        if(refreshToken != null) {
+                            Date exp = Date.from(Objects.requireNonNull(refreshToken.getToken().getExpiresAt()));
+                            claims.put("refreshExp", exp.getTime());
+                        }
 
                         log.debug("✅ /userinfo 응답 생성: {}", claims);
                         return new OidcUserInfo(claims);
