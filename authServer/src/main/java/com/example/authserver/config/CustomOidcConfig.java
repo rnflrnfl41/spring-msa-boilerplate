@@ -87,7 +87,7 @@ public class CustomOidcConfig {
                         claims.put("loginId", user.getLoginId() != null ? user.getLoginId() : "");
                         claims.put("phone", user.getPhone() != null ? user.getPhone() : "");
                         claims.put("role", user.getRole() != null ? user.getRole().name() : "");
-                        claims.put("provider", user.getProvider() != null ? user.getProvider() : "");
+                        claims.put("provider", user.getProvider() != null ? user.getProvider() : "일반 로그인");
                         claims.put("profileImg", user.getProfileImg() != null ? user.getProfileImg() : "");
 
                         OAuth2Authorization.Token<?> accessToken = authorization.getAccessToken();
