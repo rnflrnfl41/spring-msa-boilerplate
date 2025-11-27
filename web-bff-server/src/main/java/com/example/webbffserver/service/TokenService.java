@@ -3,6 +3,9 @@ package com.example.webbffserver.service;
 import com.example.webbffserver.config.AppProperties;
 import com.example.webbffserver.dto.TokenResponse;
 import com.example.webbffserver.utils.CookieUtil;
+
+import static com.example.webbffserver.utils.CookieUtil.ACCESS_TOKEN_COOKIE;
+import static com.example.webbffserver.utils.CookieUtil.REFRESH_TOKEN_COOKIE;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
@@ -20,8 +23,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
-import java.time.Duration;
-import java.util.HashMap;
 import java.util.Map;
 
 @Slf4j
@@ -124,17 +125,54 @@ public class TokenService {
 
     /**
      * 사용자 정보 조회 (JWT 토큰에서 직접 추출)
+     * 토큰 만료 시 자동 갱신 후 재시도
      */
-    public Map<String, Object> getUserInfo(String accessToken) {
+    public Map<String, Object> getUserInfo(String accessToken, HttpServletRequest req, HttpServletResponse res) {
         try {
-            return webClient.get()
+            // 1차 시도
+            Map<String, Object> userInfo = webClient.get()
                     .uri(appProperties.getAuthServerUserInfoUrl())
                     .headers(headers -> headers.setBearerAuth(accessToken))
                     .retrieve()
-                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {
+                    .onStatus(HttpStatusCode::is4xxClientError, response -> {
+                        // 401 에러 시 토큰 만료 가능성
+                        if (response.statusCode() == HttpStatus.UNAUTHORIZED) {
+                            log.warn("⚠️ Auth Server에서 401 응답, 토큰 만료 가능성 - 갱신 시도");
+                            return Mono.empty(); // 예외를 던지지 않고 null 반환하도록
+                        }
+                        return response.bodyToMono(String.class)
+                                .doOnNext(body -> log.error("📩 4xx 응답 내용: {}", body))
+                                .map(RuntimeException::new);
                     })
+                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
                     .block();
 
+            // 401 에러로 null이 반환된 경우 토큰 갱신 후 재시도
+            if (userInfo == null && req != null && res != null) {
+                log.info("🔄 토큰 만료로 인한 401 응답, 자동 갱신 후 재시도");
+                boolean refreshed = refreshToken(req, res);
+                if (refreshed) {
+                    // 새 토큰으로 재시도
+                    String newToken = CookieUtil.getCookie(req, ACCESS_TOKEN_COOKIE);
+                    if (newToken != null) {
+                        log.info("✅ 토큰 갱신 성공, userInfo 재요청");
+                        return webClient.get()
+                                .uri(appProperties.getAuthServerUserInfoUrl())
+                                .headers(headers -> headers.setBearerAuth(newToken))
+                                .retrieve()
+                                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                                .block();
+                    }
+                }
+                log.error("❌ 토큰 갱신 실패 또는 새 토큰을 가져올 수 없음");
+                return null;
+            }
+
+            return userInfo;
+
+        } catch (WebClientResponseException.Unauthorized e) {
+            log.error("❌ Auth Server 인증 실패: {}", e.getMessage());
+            return null;
         } catch (Exception e) {
             log.error("❌ userInfo 조회 실패: {}", e.getMessage());
             return null;
@@ -144,13 +182,30 @@ public class TokenService {
     /**
      * JWT 토큰 만료 여부 확인
      */
-    private boolean isTokenExpired(JWTClaimsSet claimsSet) {
+    public boolean isTokenExpired(JWTClaimsSet claimsSet) {
         try {
-            return claimsSet.getExpirationTime().before(new java.util.Date());
+            if (claimsSet == null || claimsSet.getExpirationTime() == null) {
+                return true;
+            }
+            // 30초 여유 시간을 두고 만료 확인 (만료 직전에도 갱신)
+            long now = System.currentTimeMillis();
+            long expirationTime = claimsSet.getExpirationTime().getTime();
+            return expirationTime <= (now + 30000); // 30초 전부터 만료로 간주
         } catch (Exception e) {
             log.error("❌ 토큰 만료 시간 확인 실패: {}", e.getMessage());
             return true; // 확인할 수 없으면 만료된 것으로 처리
         }
+    }
+
+    /**
+     * 토큰이 만료되었는지 확인 (토큰 문자열로)
+     */
+    public boolean isTokenExpired(String token) {
+        if (token == null || token.isEmpty()) {
+            return true;
+        }
+        JWTClaimsSet claimsSet = parseToken(token);
+        return isTokenExpired(claimsSet);
     }
 
     public JWTClaimsSet parseToken(String token) {
