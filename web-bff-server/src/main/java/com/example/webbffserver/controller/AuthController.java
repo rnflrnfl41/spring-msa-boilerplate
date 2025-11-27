@@ -128,35 +128,6 @@ public class AuthController {
     }
 
     /**
-     * 4️⃣ SPA → BFF (로그인 상태 확인)
-     * SPA가 리다이렉트된 후 로그인 상태를 확인
-     */
-    @GetMapping("/status")
-    public ResponseEntity<Map<String, Object>> getStatus(HttpServletRequest request) {
-        Map<String, Object> result = new HashMap<>();
-
-        try {
-
-            String accessToken = CookieUtil.getCookie(request, ACCESS_TOKEN_COOKIE);
-            if (accessToken == null) {
-                result.put("authenticated", false);
-                result.put("message", "토큰 없음");
-                return ResponseEntity.ok(result);
-            }
-
-            result.put("authenticated", true);
-            result.put("message", "인증됨");
-            return ResponseEntity.ok(result);
-
-        } catch (Exception e) {
-            log.error("❌ 상태 확인 실패: {}", e.getMessage());
-            result.put("authenticated", false);
-            result.put("error", e.getMessage());
-            return ResponseEntity.ok(result);
-        }
-    }
-
-    /**
      * 사용자 정보 반환
      */
     @GetMapping("/user/me")
