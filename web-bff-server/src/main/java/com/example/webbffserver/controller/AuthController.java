@@ -7,7 +7,6 @@ import com.example.webbffserver.config.AppProperties;
 import com.example.webbffserver.dto.TokenResponse;
 import com.example.webbffserver.service.TokenService;
 import com.example.webbffserver.utils.CookieUtil;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +14,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -131,7 +129,9 @@ public class AuthController {
      * 사용자 정보 반환
      */
     @GetMapping("/user/me")
-    public ResponseEntity<Map<String, Object>> getUserInfo(HttpServletRequest request) {
+    public ResponseEntity<Map<String, Object>> getUserInfo(
+            HttpServletRequest request,
+            HttpServletResponse response) {
         Map<String, Object> result = new HashMap<>();
 
         try {
@@ -144,12 +144,12 @@ public class AuthController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(result);
             }
 
-            // Auth Server에서 사용자 정보 조회
-            Map<String, Object> userInfo = tokenService.getUserInfo(accessToken);
+            // Auth Server에서 사용자 정보 조회 (토큰 만료 시 자동 갱신 포함)
+            Map<String, Object> userInfo = tokenService.getUserInfo(accessToken, request, response);
             if (userInfo == null) {
                 result.put("success", false);
                 result.put("error", "사용자 정보 조회 실패");
-                return ResponseEntity.badRequest().body(result);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(result);
             }
 
             result.put("success", true);
