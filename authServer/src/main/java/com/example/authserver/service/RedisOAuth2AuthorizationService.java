@@ -102,29 +102,44 @@ public class RedisOAuth2AuthorizationService implements OAuth2AuthorizationServi
 
         // ② 토큰 단계 (AccessToken / RefreshToken 발급 시점)
         if (accessToken != null) {
-            // 기존 code 단계 데이터 가져오기
+            // 기존 데이터 가져오기 (code 단계 또는 token 단계)
             Object oldObj = redisTemplate.opsForValue().get(AUTHORIZATION_PREFIX + authorization.getId());
             AuthCodeEntity oldEntity = null;
+            TokenEntity oldTokenEntity = null;
+            
             if (oldObj instanceof AuthCodeEntity e) {
                 oldEntity = e;
+            } else if (oldObj instanceof TokenEntity te) {
+                oldTokenEntity = te;
             } else if (oldObj != null) {
+                // 방어적 변환 시도
                 try {
                     oldEntity = objectMapper.convertValue(oldObj, AuthCodeEntity.class);
                 } catch (Exception ex) {
-                    log.warn("⚠️ cannot convert prev auth to AuthCodeEntity: {}", ex.getMessage());
+                    try {
+                        oldTokenEntity = objectMapper.convertValue(oldObj, TokenEntity.class);
+                    } catch (Exception ex2) {
+                        log.warn("⚠️ cannot convert prev auth to AuthCodeEntity/TokenEntity: {}", ex2.getMessage());
+                    }
                 }
             }
 
             Authentication principal = (oldEntity != null)
                     ? (Authentication) oldEntity.getPrincipal()
+                    : (oldTokenEntity != null)
+                    ? (Authentication) oldTokenEntity.getPrincipal()
                     : authorization.getAttribute(Principal.class.getName());
 
             OAuth2AuthorizationRequest authRequest = (oldEntity != null)
                     ? oldEntity.getAuthorizationRequest()
+                    : (oldTokenEntity != null)
+                    ? oldTokenEntity.getAuthorizationRequest()
                     : authorization.getAttribute(OAuth2AuthorizationRequest.class.getName());
 
             Set<String> scopes = (oldEntity != null)
                     ? oldEntity.getScopes()
+                    : (oldTokenEntity != null)
+                    ? oldTokenEntity.getScopes()
                     : authorization.getAuthorizedScopes();
 
             // ✅ AccessToken 자체의 scope (UserInfo에서 보는 scope는 이거다!)
@@ -161,6 +176,20 @@ public class RedisOAuth2AuthorizationService implements OAuth2AuthorizationServi
             // 🔴 기존 code 인덱스(code → id) 삭제
             if (oldEntity != null && oldEntity.getCode() != null) {
                 redisTemplate.delete(AUTHORIZATION_CODE_PREFIX + oldEntity.getCode());
+            }
+
+            // 🔴 기존 access token 인덱스 삭제 (refresh grant인 경우 이전 토큰 무효화)
+            if (oldTokenEntity != null && oldTokenEntity.getAccessTokenValue() != null) {
+                redisTemplate.delete(AUTHORIZATION_ACCESS_TOKEN_PREFIX + oldTokenEntity.getAccessTokenValue());
+                log.debug("🗑️ Deleted old access token index: {}", oldTokenEntity.getAccessTokenValue());
+            }
+
+            // 🔴 기존 refresh token 인덱스 삭제 (새 refresh token이 발급되는 경우)
+            if (oldTokenEntity != null && oldTokenEntity.getRefreshTokenValue() != null 
+                    && tokenEntity.getRefreshTokenValue() != null
+                    && !oldTokenEntity.getRefreshTokenValue().equals(tokenEntity.getRefreshTokenValue())) {
+                redisTemplate.delete(AUTHORIZATION_REFRESH_TOKEN_PREFIX + oldTokenEntity.getRefreshTokenValue());
+                log.debug("🗑️ Deleted old refresh token index: {}", oldTokenEntity.getRefreshTokenValue());
             }
 
             // id → tokenEntity 로 덮어쓰기

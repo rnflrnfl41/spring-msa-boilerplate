@@ -27,8 +27,8 @@ public class JwtFromCookieFilter extends OncePerRequestFilter {
     private static final List<String> EXCLUDED_PATHS = List.of(
             "/api/auth/login",
             "/api/auth/logout",
-            "/api/auth/refresh",
             "/api/auth/callback",
+            "/api/auth/user/me",
             "/oauth2",
             "/public",
             "/.well-known"

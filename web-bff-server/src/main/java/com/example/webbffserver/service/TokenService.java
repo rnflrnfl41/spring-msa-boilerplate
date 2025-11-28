@@ -108,7 +108,9 @@ public class TokenService {
                     })
                     .block();
 
-            if (tokenResponse == null || !tokenResponse.containsKey("access_token")) return false;
+            if (tokenResponse == null || !tokenResponse.containsKey("access_token")) {
+                return false;
+            }
 
             String newAccess = (String) tokenResponse.get("access_token");
             String newRefresh = (String) tokenResponse.getOrDefault("refresh_token", refreshToken);
@@ -118,7 +120,8 @@ public class TokenService {
             return true;
 
         } catch (Exception e) {
-            log.error("❌ Refresh 중 예외 발생: {}", e.getMessage());
+            log.error("❌ Refresh 중 예외 발생: {}, 토큰 제거 처리", e.getMessage());
+            CookieUtil.clearTokenCookies(res, false);
             return false;
         }
     }
@@ -133,41 +136,63 @@ public class TokenService {
             Map<String, Object> userInfo = webClient.get()
                     .uri(appProperties.getAuthServerUserInfoUrl())
                     .headers(headers -> headers.setBearerAuth(accessToken))
-                    .retrieve()
-                    .onStatus(HttpStatusCode::is4xxClientError, response -> {
-                        // 401 에러 시 토큰 만료 가능성
+                    .exchangeToMono(response -> {
                         if (response.statusCode() == HttpStatus.UNAUTHORIZED) {
-                            log.warn("⚠️ Auth Server에서 401 응답, 토큰 만료 가능성 - 갱신 시도");
-                            return Mono.empty(); // 예외를 던지지 않고 null 반환하도록
+                            log.warn("⚠️ Auth Server에서 401 응답, 토큰 만료 가능성 - 에러 응답 파싱");
+                            return response.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                                    .doOnNext(errorBody -> {
+                                        String error = (String) errorBody.getOrDefault("error", "");
+                                        log.warn("⚠️ 401 에러 상세: {}", error);
+                                    });
+                        } else if (response.statusCode().is4xxClientError()) {
+                            return response.bodyToMono(String.class)
+                                    .doOnNext(body -> log.error("📩 4xx 응답 내용: {}", body))
+                                    .flatMap(body -> Mono.error(new RuntimeException("4xx Client Error: " + body)));
+                        } else if (response.statusCode().is2xxSuccessful()) {
+                            return response.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {});
+                        } else {
+                            return response.bodyToMono(String.class)
+                                    .flatMap(body -> Mono.error(new RuntimeException("Unexpected status: " + response.statusCode())));
                         }
-                        return response.bodyToMono(String.class)
-                                .doOnNext(body -> log.error("📩 4xx 응답 내용: {}", body))
-                                .map(RuntimeException::new);
                     })
-                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
                     .block();
 
-            // 401 에러로 null이 반환된 경우 토큰 갱신 후 재시도
-            if (userInfo == null && req != null && res != null) {
-                log.info("🔄 토큰 만료로 인한 401 응답, 자동 갱신 후 재시도");
-                boolean refreshed = refreshToken(req, res);
-                if (refreshed) {
-                    // 새 토큰으로 재시도
-                    String newToken = CookieUtil.getCookie(req, ACCESS_TOKEN_COOKIE);
-                    if (newToken != null) {
-                        log.info("✅ 토큰 갱신 성공, userInfo 재요청");
-                        return webClient.get()
-                                .uri(appProperties.getAuthServerUserInfoUrl())
-                                .headers(headers -> headers.setBearerAuth(newToken))
-                                .retrieve()
-                                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-                                .block();
+            // 401 에러로 error 필드가 있거나 null인 경우 토큰 갱신 후 재시도
+            if (req != null && res != null) {
+                boolean shouldRefresh = false;
+                String error = null;
+                
+                if (userInfo == null) {
+                    shouldRefresh = true;
+                } else if (userInfo.containsKey("error")) {
+                    error = (String) userInfo.get("error");
+                    if ("invalid_token".equals(error) || "expired_token".equals(error)) {
+                        shouldRefresh = true;
                     }
                 }
-                log.error("❌ 토큰 갱신 실패 또는 새 토큰을 가져올 수 없음");
-                return null;
+                
+                if (shouldRefresh) {
+                    log.info("🔄 토큰 만료로 인한 401 응답 (error: {}), 자동 갱신 후 재시도", error);
+                    boolean refreshed = refreshToken(req, res);
+                    if (refreshed) {
+                        // 새 토큰으로 재시도
+                        String newToken = CookieUtil.getCookie(req, ACCESS_TOKEN_COOKIE);
+                        if (newToken != null) {
+                            log.info("✅ 토큰 갱신 성공, userInfo 재요청");
+                            return webClient.get()
+                                    .uri(appProperties.getAuthServerUserInfoUrl())
+                                    .headers(headers -> headers.setBearerAuth(newToken))
+                                    .retrieve()
+                                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                                    .block();
+                        }
+                    }
+                    log.error("❌ 토큰 갱신 실패 또는 새 토큰을 가져올 수 없음");
+                    return null;
+                }
             }
 
+            // 정상 응답인 경우 그대로 반환
             return userInfo;
 
         } catch (WebClientResponseException.Unauthorized e) {
