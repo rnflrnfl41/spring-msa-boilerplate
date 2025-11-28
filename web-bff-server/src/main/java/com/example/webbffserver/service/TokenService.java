@@ -130,6 +130,7 @@ public class TokenService {
      * 사용자 정보 조회 (JWT 토큰에서 직접 추출)
      * 토큰 만료 시 자동 갱신 후 재시도
      */
+    //TODO: 토큰 만료시 재발급 까지는 되는대 해당 토큰으로 auth server에서 인증이 안됌 확인후 수정 해야함
     public Map<String, Object> getUserInfo(String accessToken, HttpServletRequest req, HttpServletResponse res) {
         try {
             // 1차 시도
