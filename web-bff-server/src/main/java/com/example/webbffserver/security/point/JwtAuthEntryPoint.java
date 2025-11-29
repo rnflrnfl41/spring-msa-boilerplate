@@ -25,8 +25,8 @@ public class JwtAuthEntryPoint implements AuthenticationEntryPoint {
 
         // JWT 만료 or 검증 실패 감지
         if (ex.getCause() instanceof JwtValidationException) {
-            boolean refreshed = tokenService.refreshToken(req, res);
-            if (refreshed) {
+            String newToken = tokenService.refreshToken(req, res);
+            if (newToken != null) {
                 res.setStatus(CustomHttpStatus.RETRY_WITH.getCode());
                 res.getWriter().write("Token refreshed. Please retry your request.");
                 return;

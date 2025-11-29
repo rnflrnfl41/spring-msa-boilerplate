@@ -30,16 +30,20 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RedisOAuth2AuthorizationService implements OAuth2AuthorizationService {
 
+    //TODO: 만약 redis에서 TTL 만료로 authorization이 사라진다?
+    // 그럼 어떻게 처리 되야하는지도 확인해야함 (로그인창으로 리다이렉트 던가 등)
+    // 그리고 httpOnly쿠키에 들어가 있는 토큰 값도 날려줘야함
+
     private final RedisTemplate<String, Object> redisTemplate;
     private final RegisteredClientRepository registeredClientRepository;
     private final ObjectMapper objectMapper;
 
     // 메인 저장
-    private static final String AUTHORIZATION_PREFIX = "oauth2:authorization:";           // id → AuthCodeEntity or TokenEntity
+    private static final String AUTHORIZATION_PREFIX = "oauth2:auth:";           // id → AuthCodeEntity or TokenEntity
     // 인덱스
-    private static final String AUTHORIZATION_CODE_PREFIX = "oauth2:authorization:code:"; // code → id
-    private static final String AUTHORIZATION_ACCESS_TOKEN_PREFIX = "oauth2:authorization:access_token:"; // accessToken → id
-    private static final String AUTHORIZATION_REFRESH_TOKEN_PREFIX = "oauth2:authorization:refresh_token:"; // refreshToken → id
+    private static final String AUTHORIZATION_CODE_PREFIX = "oauth2:code:"; // code → id
+    private static final String AUTHORIZATION_ACCESS_TOKEN_PREFIX = "oauth2:access_token:"; // accessToken → id
+    private static final String AUTHORIZATION_REFRESH_TOKEN_PREFIX = "oauth2:refresh_token:"; // refreshToken → id
 
     // 전체 TTL (단, accessToken / refreshToken은 만료 시간에 맞춰 별도로 TTL 줌)
     private static final Duration TTL = Duration.ofMinutes(10);

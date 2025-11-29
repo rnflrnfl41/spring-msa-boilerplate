@@ -60,16 +60,14 @@ public class JwtFromCookieFilter extends OncePerRequestFilter {
         // 토큰이 있고 만료되었으면 자동 갱신
         if (accessToken != null && tokenService.isTokenExpired(accessToken)) {
             log.info("🔄 AccessToken 만료 감지, 자동 갱신 시도: {}", path);
-            boolean refreshed = tokenService.refreshToken(req, res);
-            if (refreshed) {
-                // 새 토큰으로 교체
-                accessToken = CookieUtil.getCookie(req, ACCESS_TOKEN_COOKIE);
-                log.info("✅ 토큰 갱신 성공, 요청 재시도: {}", path);
-            } else {
+            accessToken = tokenService.refreshToken(req, res);
+
+            if (accessToken == null) {
                 log.error("❌ 토큰 갱신 실패: {}", path);
                 res.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token expired and refresh failed");
                 return;
             }
+
         }
 
         // Authorization 헤더에 토큰 추가 (없는 경우만)

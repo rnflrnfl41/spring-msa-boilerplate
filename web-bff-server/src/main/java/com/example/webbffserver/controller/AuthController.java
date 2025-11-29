@@ -6,16 +6,20 @@ import com.example.constants.LoginResult;
 import com.example.webbffserver.config.AppProperties;
 import com.example.webbffserver.dto.TokenResponse;
 import com.example.webbffserver.service.TokenService;
+import com.example.webbffserver.service.UserService;
 import com.example.webbffserver.utils.CookieUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
+import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -32,6 +36,7 @@ import static com.example.webbffserver.utils.CookieUtil.*;
 public class AuthController {
 
     private final TokenService tokenService;
+    private final UserService  userService;
     private final AppProperties appProperties;
     private final WebClient webClient;
 
@@ -69,10 +74,6 @@ public class AuthController {
                 response.sendRedirect(buildFrontendRedirectUrl(LoginResult.FAILED, ErrorCode.TOKEN_EXCHANGE_FAILED));
                 return;
             }
-
-            // 4️⃣ 토큰을 세션으로 저장
-            //String sessionId = UUID.randomUUID().toString();
-            //tokenService.saveToken(sessionId, tokenResponse);
 
             String accessToken = tokenResponse.getAccessToken();
             String refreshToken = tokenResponse.getRefreshToken();
@@ -145,7 +146,8 @@ public class AuthController {
             }
 
             // Auth Server에서 사용자 정보 조회 (토큰 만료 시 자동 갱신 포함)
-            Map<String, Object> userInfo = tokenService.getUserInfo(accessToken, request, response);
+            Map<String, Object> userInfo = userService.getUserInfo(accessToken,request,response);
+
             if (userInfo == null) {
                 result.put("success", false);
                 result.put("error", "사용자 정보 조회 실패");
