@@ -82,9 +82,13 @@ public class TokenService {
     }
 
 
-    public boolean refreshToken(HttpServletRequest req, HttpServletResponse res) {
+    public String refreshToken(HttpServletRequest req, HttpServletResponse res) {
         String refreshToken = CookieUtil.getCookie(req, "REFRESH_TOKEN");
-        if (refreshToken == null) return false;
+        
+        if (refreshToken == null){
+            log.error("❌ Refresh 토큰 없음");
+            return null;
+        } 
 
         MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
         formData.add("grant_type", "refresh_token");
@@ -109,7 +113,7 @@ public class TokenService {
                     .block();
 
             if (tokenResponse == null || !tokenResponse.containsKey("access_token")) {
-                return false;
+                return null;
             }
 
             String newAccess = (String) tokenResponse.get("access_token");
@@ -117,12 +121,12 @@ public class TokenService {
 
             CookieUtil.addTokenCookies(res, newAccess, newRefresh, false);
             log.info("✅ Refresh 성공, 새 AccessToken 발급 완료");
-            return true;
+            return newAccess;
 
         } catch (Exception e) {
             log.error("❌ Refresh 중 예외 발생: {}, 토큰 제거 처리", e.getMessage());
             CookieUtil.clearTokenCookies(res, false);
-            return false;
+            return null;
         }
     }
 
@@ -174,10 +178,9 @@ public class TokenService {
                 
                 if (shouldRefresh) {
                     log.info("🔄 토큰 만료로 인한 401 응답 (error: {}), 자동 갱신 후 재시도", error);
-                    boolean refreshed = refreshToken(req, res);
-                    if (refreshed) {
+                    String newToken = refreshToken(req, res);
+                    if (newToken != null) {
                         // 새 토큰으로 재시도
-                        String newToken = CookieUtil.getCookie(req, ACCESS_TOKEN_COOKIE);
                         if (newToken != null) {
                             log.info("✅ 토큰 갱신 성공, userInfo 재요청");
                             return webClient.get()
