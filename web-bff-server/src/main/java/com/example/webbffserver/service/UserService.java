@@ -26,7 +26,7 @@ public class UserService {
 
 
     /**
-     * 사용자 정보 조회 (JWT 토큰에서 직접 추출)
+     * 사용자 정보 조회
      * 토큰 만료 시 자동 갱신 후 재시도
      */
     public Map<String, Object> getUserInfo(String accessToken, HttpServletRequest req, HttpServletResponse res) {
