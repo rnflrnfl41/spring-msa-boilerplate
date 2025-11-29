@@ -25,11 +25,6 @@ import java.util.function.Function;
 @Configuration
 public class CustomOidcConfig {
 
-    /**
-     * TODO: 현재 tokenCustomizer로 idToken을 커스텀 하고있는대 /userinfo api를 요청하면 sub,name,email 밖에 내려오지않음
-     *  정보를 더 받을수 있도록 커스텀 매핑 필요
-     */
-
     @Bean
     public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer() {
         return context -> {
