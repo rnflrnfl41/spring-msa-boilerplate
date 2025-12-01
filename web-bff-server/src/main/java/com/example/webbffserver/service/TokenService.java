@@ -4,8 +4,6 @@ import com.example.webbffserver.config.AppProperties;
 import com.example.webbffserver.dto.TokenResponse;
 import com.example.webbffserver.utils.CookieUtil;
 
-import static com.example.webbffserver.utils.CookieUtil.ACCESS_TOKEN_COOKIE;
-import static com.example.webbffserver.utils.CookieUtil.REFRESH_TOKEN_COOKIE;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
@@ -24,6 +22,9 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
+import java.util.Objects;
+
+import static com.example.webbffserver.utils.CookieUtil.*;
 
 @Slf4j
 @Service
@@ -126,6 +127,22 @@ public class TokenService {
         } catch (Exception e) {
             log.error("❌ Refresh 중 예외 발생: {}, 토큰 제거 처리", e.getMessage());
             CookieUtil.clearTokenCookies(res, false);
+            String jSessionId = CookieUtil.getCookie(req, JSESSIONID_COOKIE);
+
+            try {
+
+                webClient.post()
+                        .uri(appProperties.getAuthServerLogoutUrl())
+                        .cookie(JSESSIONID_COOKIE, Objects.requireNonNull(jSessionId))
+                        .retrieve()
+                        .toBodilessEntity()
+                        .block();
+
+            } catch (Exception logoutEx) {
+                log.warn("⚠️ Auth Server 로그아웃 호출 실패: {}", logoutEx.getMessage());
+            }
+
+            log.info("🔄 RefreshToken 만료로 인한 세션 삭제, 재인증 필요");
             return null;
         }
     }
