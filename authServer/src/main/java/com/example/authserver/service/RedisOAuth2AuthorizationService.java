@@ -11,7 +11,6 @@ import org.springframework.security.oauth2.core.*;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
-import org.springframework.security.oauth2.core.oidc.OidcScopes;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationCode;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
@@ -196,11 +195,23 @@ public class RedisOAuth2AuthorizationService implements OAuth2AuthorizationServi
                 log.debug("🗑️ Deleted old refresh token index: {}", oldTokenEntity.getRefreshTokenValue());
             }
 
+            // ✅ 메인 authorization 객체 TTL 설정: refreshToken이 있으면 refreshToken 만료 시간에 맞춤
+            // refreshToken이 없으면 기본 TTL 사용 (accessToken 만료 시간은 너무 짧음)
+            Duration mainTtl;
+            if (tokenEntity.getRefreshTokenValue() != null && tokenEntity.getRefreshTokenExpiresAt() != null) {
+                // refreshToken이 있으면 refreshToken 만료 시간에 맞춤
+                long refreshTtlSeconds = calcTtlSeconds(tokenEntity.getRefreshTokenExpiresAt());
+                mainTtl = Duration.ofSeconds(refreshTtlSeconds);
+            } else {
+                // refreshToken이 없으면 기본 TTL 사용 (일반적으로 refreshToken은 항상 발급됨)
+                mainTtl = TTL;
+            }
+
             // id → tokenEntity 로 덮어쓰기
             redisTemplate.opsForValue().set(
                     AUTHORIZATION_PREFIX + authorization.getId(),
                     tokenEntity,
-                    TTL
+                    mainTtl
             );
 
             // accessTokenValue → id 인덱스
