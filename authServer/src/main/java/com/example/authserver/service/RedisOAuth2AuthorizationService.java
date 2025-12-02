@@ -29,10 +29,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RedisOAuth2AuthorizationService implements OAuth2AuthorizationService {
 
-    //TODO: 만약 redis에서 TTL 만료로 authorization이 사라진다?
-    // 그럼 어떻게 처리 되야하는지도 확인해야함 (로그인창으로 리다이렉트 던가 등)
-    // 그리고 httpOnly쿠키에 들어가 있는 토큰 값도 날려줘야함
-
     private final RedisTemplate<String, Object> redisTemplate;
     private final RegisteredClientRepository registeredClientRepository;
     private final ObjectMapper objectMapper;
