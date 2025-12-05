@@ -15,6 +15,7 @@ public class AppProperties {
         private int authServer;
         private int frontend;
         private int authGateway;
+        private int apiGateway;
     }
 
     public String getAuthServerUrl() {
@@ -27,6 +28,10 @@ public class AppProperties {
 
     public String getFrontendUrl() {
         return baseUrl + ":" + ports.getFrontend();
+    }
+
+    public String getApiGatewayUrl() {
+        return baseUrl + ":" + ports.getApiGateway();
     }
 
     public String getAuthServerTokenUrl(){
