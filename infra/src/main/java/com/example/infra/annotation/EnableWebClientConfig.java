@@ -9,5 +9,5 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @Import(WebClientConfig.class)
-public @interface EnableWebConfig {
+public @interface EnableWebClientConfig {
 }

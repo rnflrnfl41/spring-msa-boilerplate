@@ -47,3 +47,4 @@ app:
     auth-server: 9090
     frontend: 3000
     auth-gateway: 9091
+    api-gateway: 8080
